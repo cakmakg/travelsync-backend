@@ -1,0 +1,72 @@
+{
+  "name": "travelsync-backend",
+  "version": "1.0.0",
+  "description": "TravelSync Hotel Automation Platform - Backend API",
+  "main": "dist/server.js",
+  "scripts": {
+    "dev": "nodemon src/server.js",
+    "build": "tsc",
+    "start": "node src/server.js",
+    "test:watch": "jest --watch",
+    "lint": "eslint src/**/*.ts",
+    "lint:fix": "eslint src/**/*.ts --fix",
+    "format": "prettier --write \"src/**/*.ts\""
+  },
+  "keywords": [
+    "hotel",
+    "tourism",
+    "automation",
+    "booking",
+    "pms",
+    "rate-plans",
+    "inventory"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "mongoose": "^8.0.3",
+    "bcrypt": "^5.1.1",
+    "jsonwebtoken": "^9.0.2",
+    "cors": "^2.8.5",
+    "helmet": "^7.1.0",
+    "morgan": "^1.10.0",
+    "dotenv": "^16.3.1",
+    "express-validator": "^7.0.1",
+    "zod": "^3.22.4",
+    "date-fns": "^3.0.6",
+    "nodemailer": "^6.9.7",
+    "winston": "^3.11.0",
+    "compression": "^1.7.4",
+    "express-rate-limit": "^7.1.5",
+    "express-mongo-sanitize": "^2.2.0",
+    "hpp": "^0.2.3"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.10.6",
+    "@types/bcrypt": "^5.0.2",
+    "@types/jsonwebtoken": "^9.0.5",
+    "@types/cors": "^2.8.17",
+    "@types/morgan": "^1.9.9",
+    "@types/nodemailer": "^6.4.14",
+    "@types/compression": "^1.7.5",
+    "@types/hpp": "^0.2.6",
+    "@types/jest": "^29.5.11",
+    "@types/supertest": "^6.0.2",
+    "typescript": "^5.3.3",
+    "ts-node": "^10.9.2",
+    "nodemon": "^3.0.2",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.1.1",
+    "supertest": "^6.3.3",
+    "eslint": "^8.56.0",
+    "@typescript-eslint/eslint-plugin": "^6.17.0",
+    "@typescript-eslint/parser": "^6.17.0",
+    "prettier": "^3.1.1"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=10.0.0"
+  }
+}
