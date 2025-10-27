@@ -141,11 +141,21 @@ const OrganizationSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
+    deleted_at: {
+      type: Date,
+      default: null,
+    },
 
     // Metadata
     notes: {
       type: String,
       maxlength: [1000, 'Notes cannot exceed 1000 characters'],
+    },
+    // Soft delete
+    deleted_at: {
+      type: Date,
+      default: null,
+      index: true,
     },
   },
   {

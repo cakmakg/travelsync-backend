@@ -123,6 +123,13 @@ const UserSchema = new mongoose.Schema(
         push: { type: Boolean, default: true },
       },
     },
+  
+   // Soft delete
+    deleted_at: {
+      type: Date,
+      default: null,
+      index: true,
+    },
   },
   {
     collection: 'users',
