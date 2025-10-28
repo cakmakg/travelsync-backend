@@ -296,6 +296,64 @@ class UserController extends BaseController {
   };
 
   /**
+   * 🔄 TOGGLE ACTIVE STATUS
+   * Enable/disable user account
+   */
+  toggleActive = async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      const user = await User.findOne({
+        _id: id,
+        organization_id: req.user?.organization_id,
+        deleted_at: null
+      });
+
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          error: { message: 'User not found' }
+        });
+      }
+
+      const oldStatus = user.is_active;
+      user.is_active = !user.is_active;
+      await user.save();
+
+      // Audit log
+      await AuditLog.logAction({
+        organization_id: req.user?.organization_id,
+        user_id: req.user?._id,
+        action: 'UPDATE',
+        entity_type: 'user',
+        entity_id: user._id,
+        changes: {
+          before: { is_active: oldStatus },
+          after: { is_active: user.is_active }
+        },
+        description: `User ${user.is_active ? 'activated' : 'deactivated'}`,
+        ip_address: req.ip,
+        user_agent: req.headers['user-agent']
+      });
+
+      res.status(200).json({
+        success: true,
+        data: user,
+        message: `User ${user.is_active ? 'activated' : 'deactivated'} successfully`
+      });
+    } catch (error) {
+      console.error('[User] Toggle active error:', error);
+      res.status(500).json({
+        success: false,
+        error: {
+          message: 'Failed to toggle user status',
+          details: error.message
+        }
+      });
+    }
+  };
+
+  /**
    * ✅ CHECK PERMISSION
    * Check if user has specific permission
    */

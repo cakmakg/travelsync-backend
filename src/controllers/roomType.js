@@ -1,50 +1,57 @@
 /**
- * 🏨 PROPERTY CONTROLLER
+ * 🛏️ ROOM TYPE CONTROLLER
  * 
- * Hotel/Property management
- * Features: CRUD, address management, amenities
+ * Room template management
+ * Features: CRUD, capacity management, availability
  */
 
 const BaseController = require('./base');
-const { Property } = require('../models');
+const { RoomType } = require('../models');
 
-class PropertyController extends BaseController {
+class RoomTypeController extends BaseController {
   constructor() {
-    super(Property, 'property');
+    super(RoomType, 'room_type');
+    
+    // Disable organization filtering (rooms don't directly filter by org, they filter by property)
+    this.useOrganizationFilter = false;
     
     // Search fields for getAll
-    this.searchFields = ['name', 'code', 'address.city', 'address.country'];
+    this.searchFields = ['name', 'code', 'bed_configuration'];
     
     // Populate fields
-    this.populateFields = 'organization_id';
+    this.populateFields = 'property_id';
   }
 
   /**
    * Custom validation for create
    */
   validateCreate = async (data) => {
-    // Check if property code already exists in this organization
-    if (data.code) {
-      const exists = await Property.findOne({
+    // Check if room type code already exists in this property
+    if (data.code && data.property_id) {
+      const exists = await RoomType.findOne({
         code: data.code,
-        organization_id: data.organization_id,
+        property_id: data.property_id,
         deleted_at: null
       });
 
       if (exists) {
-        return 'Property code already exists in this organization';
+        return 'Room type code already exists in this property';
       }
     }
 
-    // Validate property type
-    const validTypes = ['hotel', 'resort', 'apartment', 'guesthouse', 'hostel', 'villa'];
-    if (data.property_type && !validTypes.includes(data.property_type)) {
-      return `Invalid property type. Must be one of: ${validTypes.join(', ')}`;
+    // Validate capacity
+    if (data.capacity) {
+      if (data.capacity.adults < 1) {
+        return 'Adults capacity must be at least 1';
+      }
+      if (data.capacity.children < 0) {
+        return 'Children capacity cannot be negative';
+      }
     }
 
-    // Validate star rating
-    if (data.star_rating && (data.star_rating < 1 || data.star_rating > 5)) {
-      return 'Star rating must be between 1 and 5';
+    // Validate quantity
+    if (data.total_quantity && data.total_quantity < 1) {
+      return 'Total quantity must be at least 1';
     }
 
     return null;
@@ -56,52 +63,56 @@ class PropertyController extends BaseController {
   validateUpdate = async (data, existing) => {
     // Check if updating code and it already exists
     if (data.code && data.code !== existing.code) {
-      const exists = await Property.findOne({
+      const exists = await RoomType.findOne({
         code: data.code,
-        organization_id: existing.organization_id,
+        property_id: existing.property_id,
         _id: { $ne: existing._id },
         deleted_at: null
       });
 
       if (exists) {
-        return 'Property code already exists in this organization';
+        return 'Room type code already exists in this property';
       }
     }
 
-    // Validate property type if updating
-    const validTypes = ['hotel', 'resort', 'apartment', 'guesthouse', 'hostel', 'villa'];
-    if (data.property_type && !validTypes.includes(data.property_type)) {
-      return `Invalid property type. Must be one of: ${validTypes.join(', ')}`;
+    // Validate capacity if updating
+    if (data.capacity) {
+      if (data.capacity.adults < 1) {
+        return 'Adults capacity must be at least 1';
+      }
+      if (data.capacity.children < 0) {
+        return 'Children capacity cannot be negative';
+      }
     }
 
-    // Validate star rating if updating
-    if (data.star_rating && (data.star_rating < 1 || data.star_rating > 5)) {
-      return 'Star rating must be between 1 and 5';
+    // Validate quantity if updating
+    if (data.total_quantity && data.total_quantity < 1) {
+      return 'Total quantity must be at least 1';
     }
 
     return null;
   };
 
   /**
-   * 🌆 GET BY CITY
-   * Get all properties in a city
+   * 🏨 GET BY PROPERTY
+   * Get all room types for a property
    */
-  getByCity = async (req, res) => {
+  getByProperty = async (req, res) => {
     try {
-      const { city } = req.params;
+      const { propertyId } = req.params;
 
-      const properties = await Property.findByCity(city);
+      const roomTypes = await RoomType.findByProperty(propertyId);
 
       res.status(200).json({
         success: true,
-        data: properties
+        data: roomTypes
       });
     } catch (error) {
-      console.error('[Property] Get by city error:', error);
+      console.error('[RoomType] Get by property error:', error);
       res.status(500).json({
         success: false,
         error: {
-          message: 'Failed to get properties',
+          message: 'Failed to get room types',
           details: error.message
         }
       });
@@ -109,67 +120,105 @@ class PropertyController extends BaseController {
   };
 
   /**
-   * 🌍 GET BY COUNTRY
-   * Get all properties in a country
+   * 📦 GET BOOKABLE
+   * Get all bookable room types for a property
    */
-  getByCountry = async (req, res) => {
+  getBookable = async (req, res) => {
     try {
-      const { country } = req.params;
+      const { propertyId } = req.params;
 
-      const properties = await Property.find({
-        'address.country': country,
-        organization_id: req.user?.organization_id,
+      const roomTypes = await RoomType.findBookable(propertyId);
+
+      res.status(200).json({
+        success: true,
+        data: roomTypes
+      });
+    } catch (error) {
+      console.error('[RoomType] Get bookable error:', error);
+      res.status(500).json({
+        success: false,
+        error: {
+          message: 'Failed to get bookable room types',
+          details: error.message
+        }
+      });
+    }
+  };
+
+  /**
+   * ✅ TOGGLE ACTIVE STATUS
+   * Activate or deactivate room type
+   */
+  toggleActive = async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      const roomType = await RoomType.findOne({
+        _id: id,
         deleted_at: null
-      }).populate('organization_id');
-
-      res.status(200).json({
-        success: true,
-        data: properties
       });
-    } catch (error) {
-      console.error('[Property] Get by country error:', error);
-      res.status(500).json({
-        success: false,
-        error: {
-          message: 'Failed to get properties',
-          details: error.message
-        }
-      });
-    }
-  };
 
-  /**
-   * ⭐ GET BY RATING
-   * Get properties by star rating
-   */
-  getByRating = async (req, res) => {
-    try {
-      const { rating } = req.params;
-      const ratingNum = parseInt(rating);
-
-      if (ratingNum < 1 || ratingNum > 5) {
-        return res.status(400).json({
+      if (!roomType) {
+        return res.status(404).json({
           success: false,
-          error: { message: 'Star rating must be between 1 and 5' }
+          error: { message: 'Room type not found' }
         });
       }
 
-      const properties = await Property.find({
-        star_rating: ratingNum,
-        organization_id: req.user?.organization_id,
-        deleted_at: null
-      }).populate('organization_id');
+      roomType.is_active = !roomType.is_active;
+      await roomType.save();
 
       res.status(200).json({
         success: true,
-        data: properties
+        data: roomType,
+        message: `Room type ${roomType.is_active ? 'activated' : 'deactivated'} successfully`
       });
     } catch (error) {
-      console.error('[Property] Get by rating error:', error);
+      console.error('[RoomType] Toggle active error:', error);
       res.status(500).json({
         success: false,
         error: {
-          message: 'Failed to get properties',
+          message: 'Failed to toggle active status',
+          details: error.message
+        }
+      });
+    }
+  };
+
+  /**
+   * 📚 TOGGLE BOOKABLE STATUS
+   * Enable or disable bookability
+   */
+  toggleBookable = async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      const roomType = await RoomType.findOne({
+        _id: id,
+        deleted_at: null
+      });
+
+      if (!roomType) {
+        return res.status(404).json({
+          success: false,
+          error: { message: 'Room type not found' }
+        });
+      }
+
+      roomType.is_bookable = !roomType.is_bookable;
+      await roomType.save();
+
+      res.status(200).json({
+        success: true,
+        data: roomType,
+        message: `Room type ${roomType.is_bookable ? 'enabled' : 'disabled'} for booking`
+      });
+    } catch (error) {
+      console.error('[RoomType] Toggle bookable error:', error);
+      res.status(500).json({
+        success: false,
+        error: {
+          message: 'Failed to toggle bookable status',
           details: error.message
         }
       });
@@ -178,7 +227,7 @@ class PropertyController extends BaseController {
 
   /**
    * 🏷️ UPDATE AMENITIES
-   * Update property amenities
+   * Update room type amenities
    */
   updateAmenities = async (req, res) => {
     try {
@@ -192,29 +241,28 @@ class PropertyController extends BaseController {
         });
       }
 
-      const property = await Property.findOne({
+      const roomType = await RoomType.findOne({
         _id: id,
-        organization_id: req.user?.organization_id,
         deleted_at: null
       });
 
-      if (!property) {
+      if (!roomType) {
         return res.status(404).json({
           success: false,
-          error: { message: 'Property not found' }
+          error: { message: 'Room type not found' }
         });
       }
 
-      property.amenities = amenities;
-      await property.save();
+      roomType.amenities = amenities;
+      await roomType.save();
 
       res.status(200).json({
         success: true,
-        data: property,
+        data: roomType,
         message: 'Amenities updated successfully'
       });
     } catch (error) {
-      console.error('[Property] Update amenities error:', error);
+      console.error('[RoomType] Update amenities error:', error);
       res.status(500).json({
         success: false,
         error: {
@@ -226,88 +274,46 @@ class PropertyController extends BaseController {
   };
 
   /**
-   * 📍 GET FULL ADDRESS
-   * Get formatted full address
-   */
-  getFullAddress = async (req, res) => {
-    try {
-      const { id } = req.params;
-
-      const property = await Property.findOne({
-        _id: id,
-        organization_id: req.user?.organization_id,
-        deleted_at: null
-      });
-
-      if (!property) {
-        return res.status(404).json({
-          success: false,
-          error: { message: 'Property not found' }
-        });
-      }
-
-      const fullAddress = property.getFullAddress();
-
-      res.status(200).json({
-        success: true,
-        data: {
-          property_id: property._id,
-          property_name: property.name,
-          full_address: fullAddress,
-          coordinates: {
-            latitude: property.address.latitude,
-            longitude: property.address.longitude
-          }
-        }
-      });
-    } catch (error) {
-      console.error('[Property] Get full address error:', error);
-      res.status(500).json({
-        success: false,
-        error: {
-          message: 'Failed to get address',
-          details: error.message
-        }
-      });
-    }
-  };
-
-  /**
    * 📊 GET STATISTICS
-   * Get property statistics
+   * Get room type statistics
    */
   getStats = async (req, res) => {
     try {
       const { id } = req.params;
 
-      const property = await Property.findOne({
+      const roomType = await RoomType.findOne({
         _id: id,
-        organization_id: req.user?.organization_id,
         deleted_at: null
-      }).populate('organization_id');
+      }).populate('property_id');
 
-      if (!property) {
+      if (!roomType) {
         return res.status(404).json({
           success: false,
-          error: { message: 'Property not found' }
+          error: { message: 'Room type not found' }
         });
       }
 
-      // Calculate stats
       const stats = {
-        property: {
-          id: property._id,
-          name: property.name,
-          type: property.property_type,
-          star_rating: property.star_rating
+        room_type: {
+          id: roomType._id,
+          name: roomType.name,
+          code: roomType.code
         },
         capacity: {
-          total_rooms: property.total_rooms,
-          status: property.status
+          adults: roomType.capacity.adults,
+          children: roomType.capacity.children,
+          total: roomType.capacity.total
         },
-        contact: property.contact,
-        address: property.getFullAddress(),
-        amenities_count: property.amenities?.length || 0
+        inventory: {
+          total_quantity: roomType.total_quantity,
+          is_active: roomType.is_active,
+          is_bookable: roomType.is_bookable
+        },
+        details: {
+          bed_configuration: roomType.bed_configuration,
+          size_sqm: roomType.size_sqm,
+          amenities_count: roomType.amenities?.length || 0
+        }
       };
 
       res.status(200).json({
@@ -315,7 +321,7 @@ class PropertyController extends BaseController {
         data: stats
       });
     } catch (error) {
-      console.error('[Property] Get stats error:', error);
+      console.error('[RoomType] Get stats error:', error);
       res.status(500).json({
         success: false,
         error: {
@@ -328,4 +334,4 @@ class PropertyController extends BaseController {
 }
 
 // Export controller instance
-module.exports = new PropertyController();
+module.exports = new RoomTypeController();

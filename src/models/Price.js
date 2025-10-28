@@ -3,7 +3,7 @@
     TravelSync - Price Model
 ------------------------------------------------------- */
 
-const { mongoose } = require('../config/database');;
+const { mongoose } = require('../config/database');
 
 const PriceSchema = new mongoose.Schema(
   {
@@ -35,96 +35,75 @@ const PriceSchema = new mongoose.Schema(
     },
 
     amount: {
-      type: mongoose.Schema.Types.Decimal128,
+      type: Number,
       required: [true, 'Price amount is required'],
       min: [0, 'Price cannot be negative'],
-      get: (value) => (value ? parseFloat(value.toString()) : 0),
     },
 
     currency: {
       type: String,
-      trim: true,
+      required: [true, 'Currency is required'],
       uppercase: true,
       default: 'EUR',
-      minlength: [3, 'Currency code must be 3 characters'],
-      maxlength: [3, 'Currency code must be 3 characters'],
+      enum: {
+        values: ['EUR', 'USD', 'GBP', 'TRY'],
+        message: '{VALUE} is not a supported currency',
+      },
     },
 
-    // Source of the price
     source: {
       type: String,
-      enum: ['MANUAL', 'AI', 'IMPORT', 'DERIVED'],
+      enum: ['MANUAL', 'SYSTEM', 'CHANNEL_MANAGER', 'API'],
       default: 'MANUAL',
-      required: true,
+      index: true,
     },
 
-    // AI suggestion metadata
-    ai_suggestion: {
-      suggested_amount: mongoose.Schema.Types.Decimal128,
-      confidence: {
-        type: Number,
-        min: [0, 'Confidence must be between 0 and 1'],
-        max: [1, 'Confidence must be between 0 and 1'],
-      },
-      reasoning: String,
-      applied_at: Date,
-    },
-
-    // Overrides
     is_available: {
       type: Boolean,
       default: true,
-      comment: 'If false, room cannot be booked for this date',
     },
 
-    // Minimum stay requirement for this specific date
-    min_nights_override: {
-      type: Number,
+    // Soft delete
+    deleted_at: {
+      type: Date,
       default: null,
-      min: [1, 'Must be at least 1 night'],
-    },
-
-    // Metadata
-    notes: {
-      type: String,
-      maxlength: [500, 'Notes cannot exceed 500 characters'],
+      index: true,
     },
   },
   {
     collection: 'prices',
     timestamps: true,
-    toJSON: { getters: true },
-    toObject: { getters: true },
   }
 );
 
-// Compound unique index: One price per room type + rate plan + date
+// ============================================
+// INDEXES
+// ============================================
+
+// Compound unique index - one price per property/room/rate/date combination
 PriceSchema.index(
-  { property_id: 1, room_type_id: 1, rate_plan_id: 1, date: 1 },
+  {
+    property_id: 1,
+    room_type_id: 1,
+    rate_plan_id: 1,
+    date: 1,
+  },
   { unique: true }
 );
-PriceSchema.index({ date: 1 });
-PriceSchema.index({ source: 1 });
-PriceSchema.index({ is_available: 1 });
 
-// Methods
-PriceSchema.methods.getAmountWithTax = function (taxRate) {
-  const amount = parseFloat(this.amount.toString());
-  return amount * (1 + taxRate / 100);
-};
+// Query optimization indexes
+PriceSchema.index({ property_id: 1, date: 1 });
+PriceSchema.index({ room_type_id: 1, date: 1 });
+PriceSchema.index({ rate_plan_id: 1, date: 1 });
 
-PriceSchema.methods.applySuggestion = function () {
-  if (this.ai_suggestion && this.ai_suggestion.suggested_amount) {
-    this.amount = this.ai_suggestion.suggested_amount;
-    this.source = 'AI';
-    this.ai_suggestion.applied_at = new Date();
-    return this.save();
-  }
-  throw new Error('No AI suggestion available');
-};
+// ============================================
+// STATIC METHODS
+// ============================================
 
-// Statics
-PriceSchema.statics.findForDateRange = function (
+/**
+ * Find prices for date range
+ */
+PriceSchema.statics.findForDateRange = async function(
   propertyId,
   roomTypeId,
   ratePlanId,
@@ -136,76 +115,138 @@ PriceSchema.statics.findForDateRange = function (
     room_type_id: roomTypeId,
     rate_plan_id: ratePlanId,
     date: {
-      $gte: startDate,
-      $lte: endDate,
+      $gte: new Date(startDate),
+      $lte: new Date(endDate)
     },
+    deleted_at: null
   }).sort({ date: 1 });
 };
 
-PriceSchema.statics.calculateTotalPrice = async function (
+/**
+ * Bulk upsert prices (create or update multiple prices)
+ */
+PriceSchema.statics.bulkUpsertPrices = async function(prices) {
+  if (!Array.isArray(prices) || prices.length === 0) {
+    throw new Error('Prices array is required and cannot be empty');
+  }
+
+  const bulkOps = prices.map(price => ({
+    updateOne: {
+      filter: {
+        property_id: price.property_id,
+        room_type_id: price.room_type_id,
+        rate_plan_id: price.rate_plan_id,
+        date: new Date(price.date),
+        deleted_at: null
+      },
+      update: {
+        $set: {
+          amount: price.amount,
+          currency: price.currency || 'EUR',
+          source: price.source || 'MANUAL',
+          is_available: price.is_available !== undefined ? price.is_available : true,
+          updatedAt: new Date()
+        },
+        $setOnInsert: {
+          property_id: price.property_id,
+          room_type_id: price.room_type_id,
+          rate_plan_id: price.rate_plan_id,
+          date: new Date(price.date),
+          createdAt: new Date()
+        }
+      },
+      upsert: true
+    }
+  }));
+
+  const result = await this.bulkWrite(bulkOps);
+
+  return {
+    created: result.upsertedCount || 0,
+    updated: result.modifiedCount || 0,
+    total: prices.length
+  };
+};
+
+/**
+ * Get price for specific date
+ */
+PriceSchema.statics.getPriceForDate = async function(
   propertyId,
   roomTypeId,
   ratePlanId,
-  checkInDate,
-  checkOutDate
+  date
 ) {
-  const prices = await this.findForDateRange(
-    propertyId,
-    roomTypeId,
-    ratePlanId,
-    checkInDate,
-    checkOutDate
-  );
-
-  let total = 0;
-  prices.forEach((price) => {
-    // Don't include check-out date (hotel standard)
-    if (price.date.toDateString() !== new Date(checkOutDate).toDateString()) {
-      total += parseFloat(price.amount.toString());
-    }
+  return this.findOne({
+    property_id: propertyId,
+    room_type_id: roomTypeId,
+    rate_plan_id: ratePlanId,
+    date: new Date(date),
+    deleted_at: null
   });
-
-  return total;
 };
 
-PriceSchema.statics.bulkUpdatePrices = async function (
+/**
+ * Delete prices for date range (soft delete)
+ */
+PriceSchema.statics.deletePricesByDateRange = async function(
   propertyId,
   roomTypeId,
   ratePlanId,
   startDate,
-  endDate,
-  amount,
-  source = 'MANUAL'
+  endDate
 ) {
-  const dates = [];
-  const currentDate = new Date(startDate);
-  const end = new Date(endDate);
-
-  while (currentDate <= end) {
-    dates.push(new Date(currentDate));
-    currentDate.setDate(currentDate.getDate() + 1);
-  }
-
-  const bulkOps = dates.map((date) => ({
-    updateOne: {
-      filter: {
-        property_id: propertyId,
-        room_type_id: roomTypeId,
-        rate_plan_id: ratePlanId,
-        date: date,
+  return this.updateMany(
+    {
+      property_id: propertyId,
+      room_type_id: roomTypeId,
+      rate_plan_id: ratePlanId,
+      date: {
+        $gte: new Date(startDate),
+        $lte: new Date(endDate)
       },
-      update: {
-        $set: {
-          amount: amount,
-          source: source,
-          updated_at: new Date(),
-        },
-      },
-      upsert: true,
+      deleted_at: null
     },
-  }));
+    {
+      $set: {
+        deleted_at: new Date(),
+        updatedAt: new Date()
+      }
+    }
+  );
+};
 
-  return this.bulkWrite(bulkOps);
+/**
+ * Get prices by property
+ */
+PriceSchema.statics.findByProperty = function(propertyId, filters = {}) {
+  return this.find({
+    property_id: propertyId,
+    deleted_at: null,
+    ...filters
+  }).sort({ date: 1 });
+};
+
+/**
+ * Get prices by room type
+ */
+PriceSchema.statics.findByRoomType = function(roomTypeId, filters = {}) {
+  return this.find({
+    room_type_id: roomTypeId,
+    deleted_at: null,
+    ...filters
+  }).sort({ date: 1 });
+};
+
+/**
+ * Get prices by rate plan
+ */
+PriceSchema.statics.findByRatePlan = function(ratePlanId, filters = {}) {
+  return this.find({
+    rate_plan_id: ratePlanId,
+    deleted_at: null,
+    ...filters
+  }).sort({ date: 1 });
 };
 
 module.exports = mongoose.model('Price', PriceSchema);

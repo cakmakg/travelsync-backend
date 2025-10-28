@@ -1,436 +1,478 @@
-"use strict";
-/* -------------------------------------------------------
-    TravelSync - Reservation Controller
-    Complex logic - Uses service layer
-------------------------------------------------------- */
+/**
+ * 🎫 RESERVATION CONTROLLER
+ * 
+ * Guest booking management
+ * Features: CRUD, check-in/out, cancellation, arrivals/departures
+ */
 
-const reservationService = require('../services/reservation');
+const BaseController = require('./base');
 const { Reservation } = require('../models');
+const reservationService = require('../service/reservationService');
 
-/**
- * Create reservation (with availability check & inventory update)
- * POST /api/v1/reservations
- * @access Private
- */
-exports.create = async (req, res) => {
-  try {
-    const reservationData = {
-      ...req.body,
-      created_by_user_id: req.user._id,
-    };
+class ReservationController extends BaseController {
+  constructor() {
+    super(Reservation, 'reservation');
+    
+    // Disable organization filtering (reservations filter by property)
+    this.useOrganizationFilter = false;
+    
+    // Search fields for getAll
+    this.searchFields = ['booking_reference', 'guest.name', 'guest.email'];
+    
+    // Populate fields
+    this.populateFields = 'property_id room_type_id rate_plan_id created_by_user_id';
+  }
 
-    // Use service layer for complex logic
-    const reservation = await reservationService.createReservation(
-      reservationData,
-      req.user,
-      req.ip,
-      req.headers['user-agent']
-    );
+  /**
+   * ➕ CREATE RESERVATION (override to use service)
+   */
+  create = async (req, res) => {
+    try {
+      const data = {
+        ...req.body,
+        ip_address: req.ip,
+        user_agent: req.headers['user-agent']
+      };
 
-    res.status(201).json({
-      success: true,
-      data: { reservation },
-      message: 'Reservation created successfully',
-    });
-  } catch (error) {
-    console.error('Create reservation error:', error);
+      // Use service for complex logic
+      const result = await reservationService.createReservation(
+        data,
+        req.user?._id
+      );
 
-    // Handle specific errors
-    if (error.message.includes('not available')) {
-      return res.status(409).json({
+      res.status(201).json({
+        success: true,
+        data: result.reservation,
+        pricing: result.pricing,
+        message: 'Reservation created successfully'
+      });
+    } catch (error) {
+      console.error('[Reservation] Create error:', error);
+
+      if (error.name === 'ValidationError') {
+        return res.status(400).json({
+          success: false,
+          error: {
+            message: 'Validation failed',
+            details: Object.values(error.errors).map(e => e.message)
+          }
+        });
+      }
+
+      res.status(400).json({
         success: false,
         error: {
-          message: error.message,
-          code: 'AVAILABILITY_ERROR',
-        },
+          message: error.message || 'Failed to create reservation'
+        }
       });
     }
+  };
 
-    if (error.message.includes('Idempotency')) {
-      return res.status(409).json({
+  /**
+   * ❌ CANCEL RESERVATION
+   * Cancel a reservation
+   */
+  cancel = async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { reason } = req.body;
+
+      if (!reason) {
+        return res.status(400).json({
+          success: false,
+          error: { message: 'Cancellation reason is required' }
+        });
+      }
+
+      const reservation = await reservationService.cancelReservation(
+        id,
+        req.user?._id,
+        reason,
+        req.ip,
+        req.headers['user-agent']
+      );
+
+      res.status(200).json({
+        success: true,
+        data: reservation,
+        message: 'Reservation cancelled successfully'
+      });
+    } catch (error) {
+      console.error('[Reservation] Cancel error:', error);
+      res.status(400).json({
         success: false,
         error: {
-          message: 'Duplicate reservation request',
-          code: 'DUPLICATE_REQUEST',
-        },
+          message: error.message || 'Failed to cancel reservation'
+        }
       });
     }
+  };
 
-    if (error.name === 'ValidationError') {
-      return res.status(400).json({
+  /**
+   * 🏨 CHECK-IN RESERVATION
+   * Check-in a confirmed reservation
+   */
+  checkIn = async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      const reservation = await reservationService.checkInReservation(
+        id,
+        req.user?._id,
+        req.ip,
+        req.headers['user-agent']
+      );
+
+      res.status(200).json({
+        success: true,
+        data: reservation,
+        message: 'Guest checked in successfully'
+      });
+    } catch (error) {
+      console.error('[Reservation] Check-in error:', error);
+      res.status(400).json({
         success: false,
         error: {
-          message: 'Validation error',
-          details: Object.values(error.errors).map(err => err.message),
-        },
+          message: error.message || 'Failed to check-in guest'
+        }
       });
     }
+  };
 
-    res.status(500).json({
-      success: false,
-      error: { message: 'Failed to create reservation' },
-    });
-  }
-};
+  /**
+   * 🏁 CHECK-OUT RESERVATION
+   * Check-out a checked-in reservation
+   */
+  checkOut = async (req, res) => {
+    try {
+      const { id } = req.params;
 
-/**
- * Get all reservations
- * GET /api/v1/reservations
- * @access Private
- */
-exports.getAll = async (req, res) => {
-  try {
-    const {
-      property_id,
-      status,
-      check_in_from,
-      check_in_to,
-      page = 1,
-      limit = 20,
-    } = req.query;
+      const reservation = await reservationService.checkOutReservation(
+        id,
+        req.user?._id,
+        req.ip,
+        req.headers['user-agent']
+      );
 
-    // Build query
-    const query = {};
-
-    // Filter by property (for non-admin)
-    if (req.user.role !== 'admin' && property_id) {
-      query.property_id = property_id;
-    }
-
-    if (status) {
-      query.status = status;
-    }
-
-    if (check_in_from || check_in_to) {
-      query.check_in_date = {};
-      if (check_in_from) query.check_in_date.$gte = new Date(check_in_from);
-      if (check_in_to) query.check_in_date.$lte = new Date(check_in_to);
-    }
-
-    // Pagination
-    const skip = (page - 1) * limit;
-
-    const [reservations, total] = await Promise.all([
-      Reservation.find(query)
-        .populate('property_id', 'name code')
-        .populate('room_type_id', 'name code')
-        .populate('rate_plan_id', 'name code meal_plan')
-        .populate('created_by_user_id', 'first_name last_name email')
-        .skip(skip)
-        .limit(parseInt(limit))
-        .sort({ createdAt: -1 }),
-      Reservation.countDocuments(query),
-    ]);
-
-    res.status(200).json({
-      success: true,
-      data: {
-        reservations,
-        pagination: {
-          total,
-          page: parseInt(page),
-          pages: Math.ceil(total / limit),
-          limit: parseInt(limit),
-        },
-      },
-    });
-  } catch (error) {
-    console.error('Get reservations error:', error);
-    res.status(500).json({
-      success: false,
-      error: { message: 'Failed to fetch reservations' },
-    });
-  }
-};
-
-/**
- * Get single reservation
- * GET /api/v1/reservations/:id
- * @access Private
- */
-exports.getById = async (req, res) => {
-  try {
-    const reservation = await Reservation.findById(req.params.id)
-      .populate('property_id')
-      .populate('room_type_id')
-      .populate('rate_plan_id')
-      .populate('created_by_user_id', 'first_name last_name email');
-
-    if (!reservation) {
-      return res.status(404).json({
-        success: false,
-        error: { message: 'Reservation not found' },
+      res.status(200).json({
+        success: true,
+        data: reservation,
+        message: 'Guest checked out successfully'
       });
-    }
-
-    res.status(200).json({
-      success: true,
-      data: { reservation },
-    });
-  } catch (error) {
-    console.error('Get reservation error:', error);
-
-    if (error.name === 'CastError') {
-      return res.status(400).json({
-        success: false,
-        error: { message: 'Invalid reservation ID' },
-      });
-    }
-
-    res.status(500).json({
-      success: false,
-      error: { message: 'Failed to fetch reservation' },
-    });
-  }
-};
-
-/**
- * Update reservation
- * PUT /api/v1/reservations/:id
- * @access Private
- */
-exports.update = async (req, res) => {
-  try {
-    const reservation = await Reservation.findById(req.params.id);
-
-    if (!reservation) {
-      return res.status(404).json({
-        success: false,
-        error: { message: 'Reservation not found' },
-      });
-    }
-
-    // Check if reservation can be updated
-    if (reservation.status === 'cancelled') {
-      return res.status(400).json({
-        success: false,
-        error: { message: 'Cannot update cancelled reservation' },
-      });
-    }
-
-    // Use service for complex updates
-    const updatedReservation = await reservationService.updateReservation(
-      req.params.id,
-      req.body,
-      req.user,
-      req.ip,
-      req.headers['user-agent']
-    );
-
-    res.status(200).json({
-      success: true,
-      data: { reservation: updatedReservation },
-      message: 'Reservation updated successfully',
-    });
-  } catch (error) {
-    console.error('Update reservation error:', error);
-
-    if (error.name === 'ValidationError') {
-      return res.status(400).json({
+    } catch (error) {
+      console.error('[Reservation] Check-out error:', error);
+      res.status(400).json({
         success: false,
         error: {
-          message: 'Validation error',
-          details: Object.values(error.errors).map(err => err.message),
+          message: error.message || 'Failed to check-out guest'
+        }
+      });
+    }
+  };
+
+  /**
+   * 📅 GET TODAY'S CHECK-INS
+   * Get all reservations checking in today
+   */
+  getTodayCheckIns = async (req, res) => {
+    try {
+      const { propertyId } = req.query;
+
+      if (!propertyId) {
+        return res.status(400).json({
+          success: false,
+          error: { message: 'Property ID is required' }
+        });
+      }
+
+      const arrivals = await reservationService.getTodaysArrivals(propertyId);
+
+      res.status(200).json({
+        success: true,
+        data: arrivals,
+        count: arrivals.length
+      });
+    } catch (error) {
+      console.error('[Reservation] Get today check-ins error:', error);
+      res.status(500).json({
+        success: false,
+        error: {
+          message: 'Failed to get today\'s check-ins',
+          details: error.message
+        }
+      });
+    }
+  };
+
+  /**
+   * 🏁 GET TODAY'S CHECK-OUTS
+   * Get all reservations checking out today
+   */
+  getTodayCheckOuts = async (req, res) => {
+    try {
+      const { propertyId } = req.query;
+
+      if (!propertyId) {
+        return res.status(400).json({
+          success: false,
+          error: { message: 'Property ID is required' }
+        });
+      }
+
+      const departures = await reservationService.getTodaysDepartures(propertyId);
+
+      res.status(200).json({
+        success: true,
+        data: departures,
+        count: departures.length
+      });
+    } catch (error) {
+      console.error('[Reservation] Get today check-outs error:', error);
+      res.status(500).json({
+        success: false,
+        error: {
+          message: 'Failed to get today\'s check-outs',
+          details: error.message
+        }
+      });
+    }
+  };
+
+  /**
+   * 🔍 GET BY STATUS
+   * Get reservations by status
+   */
+  getByStatus = async (req, res) => {
+    try {
+      const { status } = req.params;
+      const { propertyId, page = 1, limit = 10 } = req.query;
+
+      const validStatuses = ['pending', 'confirmed', 'checked_in', 'checked_out', 'cancelled', 'no_show'];
+      if (!validStatuses.includes(status)) {
+        return res.status(400).json({
+          success: false,
+          error: { 
+            message: 'Invalid status',
+            valid_statuses: validStatuses
+          }
+        });
+      }
+
+      const query = {
+        status,
+        deleted_at: null
+      };
+
+      if (propertyId) {
+        query.property_id = propertyId;
+      }
+
+      const skip = (page - 1) * limit;
+
+      const [reservations, total] = await Promise.all([
+        Reservation.find(query)
+          .populate('property_id', 'name code')
+          .populate('room_type_id', 'name code')
+          .populate('rate_plan_id', 'name code')
+          .sort('-created_at')
+          .skip(skip)
+          .limit(parseInt(limit)),
+        Reservation.countDocuments(query)
+      ]);
+
+      res.status(200).json({
+        success: true,
+        data: {
+          items: reservations,
+          pagination: {
+            total,
+            page: parseInt(page),
+            pages: Math.ceil(total / limit),
+            limit: parseInt(limit)
+          }
+        }
+      });
+    } catch (error) {
+      console.error('[Reservation] Get by status error:', error);
+      res.status(500).json({
+        success: false,
+        error: {
+          message: 'Failed to get reservations',
+          details: error.message
+        }
+      });
+    }
+  };
+
+  /**
+   * 📅 GET BY DATE RANGE
+   * Get reservations within a date range
+   */
+  getByDateRange = async (req, res) => {
+    try {
+      const { start_date, end_date, propertyId, page = 1, limit = 10 } = req.query;
+
+      if (!start_date || !end_date) {
+        return res.status(400).json({
+          success: false,
+          error: { message: 'Start date and end date are required' }
+        });
+      }
+
+      const query = {
+        check_in_date: {
+          $gte: new Date(start_date),
+          $lte: new Date(end_date)
         },
+        deleted_at: null
+      };
+
+      if (propertyId) {
+        query.property_id = propertyId;
+      }
+
+      const skip = (page - 1) * limit;
+
+      const [reservations, total] = await Promise.all([
+        Reservation.find(query)
+          .populate('property_id', 'name code')
+          .populate('room_type_id', 'name code')
+          .populate('rate_plan_id', 'name code')
+          .sort('check_in_date')
+          .skip(skip)
+          .limit(parseInt(limit)),
+        Reservation.countDocuments(query)
+      ]);
+
+      res.status(200).json({
+        success: true,
+        data: {
+          items: reservations,
+          pagination: {
+            total,
+            page: parseInt(page),
+            pages: Math.ceil(total / limit),
+            limit: parseInt(limit)
+          }
+        }
       });
-    }
-
-    res.status(500).json({
-      success: false,
-      error: { message: 'Failed to update reservation' },
-    });
-  }
-};
-
-/**
- * Cancel reservation
- * POST /api/v1/reservations/:id/cancel
- * @access Private
- */
-exports.cancel = async (req, res) => {
-  try {
-    const { reason } = req.body;
-
-    // Use service for cancellation logic
-    const reservation = await reservationService.cancelReservation(
-      req.params.id,
-      reason,
-      req.user,
-      req.ip,
-      req.headers['user-agent']
-    );
-
-    res.status(200).json({
-      success: true,
-      data: { reservation },
-      message: 'Reservation cancelled successfully',
-    });
-  } catch (error) {
-    console.error('Cancel reservation error:', error);
-
-    if (error.message.includes('not found')) {
-      return res.status(404).json({
+    } catch (error) {
+      console.error('[Reservation] Get by date range error:', error);
+      res.status(500).json({
         success: false,
-        error: { message: 'Reservation not found' },
+        error: {
+          message: 'Failed to get reservations',
+          details: error.message
+        }
       });
     }
+  };
 
-    if (error.message.includes('Cannot cancel')) {
-      return res.status(400).json({
+  /**
+   * 🔍 GET BY BOOKING REFERENCE
+   * Get reservation by booking reference
+   */
+  getByBookingReference = async (req, res) => {
+    try {
+      const { bookingReference } = req.params;
+
+      const reservation = await Reservation.findOne({
+        booking_reference: bookingReference,
+        deleted_at: null
+      })
+        .populate('property_id')
+        .populate('room_type_id')
+        .populate('rate_plan_id')
+        .populate('created_by_user_id', 'first_name last_name email');
+
+      if (!reservation) {
+        return res.status(404).json({
+          success: false,
+          error: { message: 'Reservation not found' }
+        });
+      }
+
+      res.status(200).json({
+        success: true,
+        data: reservation
+      });
+    } catch (error) {
+      console.error('[Reservation] Get by booking reference error:', error);
+      res.status(500).json({
         success: false,
-        error: { message: error.message },
+        error: {
+          message: 'Failed to get reservation',
+          details: error.message
+        }
       });
     }
+  };
 
-    res.status(500).json({
-      success: false,
-      error: { message: 'Failed to cancel reservation' },
-    });
-  }
-};
+  /**
+   * 📊 GET STATISTICS
+   * Get reservation statistics
+   */
+  getStats = async (req, res) => {
+    try {
+      const { propertyId } = req.query;
 
-/**
- * Check-in reservation
- * POST /api/v1/reservations/:id/checkin
- * @access Private
- */
-exports.checkIn = async (req, res) => {
-  try {
-    const reservation = await Reservation.findById(req.params.id);
+      if (!propertyId) {
+        return res.status(400).json({
+          success: false,
+          error: { message: 'Property ID is required' }
+        });
+      }
 
-    if (!reservation) {
-      return res.status(404).json({
+      const query = { property_id: propertyId, deleted_at: null };
+
+      const [
+        total,
+        confirmed,
+        checkedIn,
+        checkedOut,
+        cancelled,
+        todaysArrivals,
+        todaysDepartures
+      ] = await Promise.all([
+        Reservation.countDocuments(query),
+        Reservation.countDocuments({ ...query, status: 'confirmed' }),
+        Reservation.countDocuments({ ...query, status: 'checked_in' }),
+        Reservation.countDocuments({ ...query, status: 'checked_out' }),
+        Reservation.countDocuments({ ...query, status: 'cancelled' }),
+        reservationService.getTodaysArrivals(propertyId),
+        reservationService.getTodaysDepartures(propertyId)
+      ]);
+
+      const stats = {
+        total_reservations: total,
+        by_status: {
+          confirmed,
+          checked_in: checkedIn,
+          checked_out: checkedOut,
+          cancelled
+        },
+        today: {
+          arrivals: todaysArrivals.length,
+          departures: todaysDepartures.length
+        }
+      };
+
+      res.status(200).json({
+        success: true,
+        data: stats
+      });
+    } catch (error) {
+      console.error('[Reservation] Get stats error:', error);
+      res.status(500).json({
         success: false,
-        error: { message: 'Reservation not found' },
+        error: {
+          message: 'Failed to get statistics',
+          details: error.message
+        }
       });
     }
+  };
+}
 
-    if (reservation.status !== 'confirmed') {
-      return res.status(400).json({
-        success: false,
-        error: { message: 'Only confirmed reservations can be checked in' },
-      });
-    }
-
-    await reservation.checkIn();
-
-    res.status(200).json({
-      success: true,
-      data: { reservation },
-      message: 'Guest checked in successfully',
-    });
-  } catch (error) {
-    console.error('Check-in error:', error);
-    res.status(500).json({
-      success: false,
-      error: { message: 'Failed to check in' },
-    });
-  }
-};
-
-/**
- * Check-out reservation
- * POST /api/v1/reservations/:id/checkout
- * @access Private
- */
-exports.checkOut = async (req, res) => {
-  try {
-    const reservation = await Reservation.findById(req.params.id);
-
-    if (!reservation) {
-      return res.status(404).json({
-        success: false,
-        error: { message: 'Reservation not found' },
-      });
-    }
-
-    if (reservation.status !== 'checked_in') {
-      return res.status(400).json({
-        success: false,
-        error: { message: 'Only checked-in guests can be checked out' },
-      });
-    }
-
-    await reservation.checkOut();
-
-    res.status(200).json({
-      success: true,
-      data: { reservation },
-      message: 'Guest checked out successfully',
-    });
-  } catch (error) {
-    console.error('Check-out error:', error);
-    res.status(500).json({
-      success: false,
-      error: { message: 'Failed to check out' },
-    });
-  }
-};
-
-/**
- * Get today's check-ins
- * GET /api/v1/reservations/today/checkins
- * @access Private
- */
-exports.getTodayCheckIns = async (req, res) => {
-  try {
-    const { property_id } = req.query;
-
-    if (!property_id) {
-      return res.status(400).json({
-        success: false,
-        error: { message: 'Property ID is required' },
-      });
-    }
-
-    const checkIns = await Reservation.findTodayCheckIns(property_id);
-
-    res.status(200).json({
-      success: true,
-      data: {
-        check_ins: checkIns,
-        count: checkIns.length,
-      },
-    });
-  } catch (error) {
-    console.error('Get today check-ins error:', error);
-    res.status(500).json({
-      success: false,
-      error: { message: 'Failed to fetch check-ins' },
-    });
-  }
-};
-
-/**
- * Get today's check-outs
- * GET /api/v1/reservations/today/checkouts
- * @access Private
- */
-exports.getTodayCheckOuts = async (req, res) => {
-  try {
-    const { property_id } = req.query;
-
-    if (!property_id) {
-      return res.status(400).json({
-        success: false,
-        error: { message: 'Property ID is required' },
-      });
-    }
-
-    const checkOuts = await Reservation.findTodayCheckOuts(property_id);
-
-    res.status(200).json({
-      success: true,
-      data: {
-        check_outs: checkOuts,
-        count: checkOuts.length,
-      },
-    });
-  } catch (error) {
-    console.error('Get today check-outs error:', error);
-    res.status(500).json({
-      success: false,
-      error: { message: 'Failed to fetch check-outs' },
-    });
-  }
-};
+// Export controller instance
+module.exports = new ReservationController();

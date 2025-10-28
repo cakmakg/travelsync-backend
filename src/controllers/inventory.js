@@ -12,6 +12,9 @@ class InventoryController extends BaseController {
   constructor() {
     super(Inventory, 'inventory');
     
+    // Disable organization filtering (inventory filters by property)
+    this.useOrganizationFilter = false;
+    
     // Populate fields
     this.populateFields = 'property_id room_type_id';
   }

@@ -144,9 +144,9 @@ class PriceController extends BaseController {
       res.status(200).json({
         success: true,
         data: {
-          upserted_count: result.upsertedCount,
-          modified_count: result.modifiedCount,
-          matched_count: result.matchedCount
+          created: result.created || 0,
+  updated: result.updated || 0,
+  total: result.total || 0
         },
         message: 'Prices updated successfully'
       });

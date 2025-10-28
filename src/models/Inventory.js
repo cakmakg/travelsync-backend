@@ -192,8 +192,7 @@ InventorySchema.statics.bulkUpdateInventory = async function (
   roomTypeId,
   startDate,
   endDate,
-  allotment,
-  stopSell = false
+  updates
 ) {
   const dates = [];
   const currentDate = new Date(startDate);
@@ -204,22 +203,37 @@ InventorySchema.statics.bulkUpdateInventory = async function (
     currentDate.setDate(currentDate.getDate() + 1);
   }
 
-  const bulkOps = dates.map((date) => ({
+  // Calculate available if allotment is provided
+  const updateFields = { ...updates };
+  if (updates.allotment !== undefined) {
+    // For upsert: available = allotment - sold (sold will be 0 for new records)
+    // For update: we need to calculate available based on existing sold value
+    updateFields.available = updates.allotment; // Initial value for new records
+  }
+
+  const bulkOps = dates.map(date => ({
     updateOne: {
       filter: {
         property_id: propertyId,
         room_type_id: roomTypeId,
-        date: date,
+        date: date
       },
-      update: {
+      update: { 
         $set: {
-          allotment: allotment,
-          stop_sell: stopSell,
-          updated_at: new Date(),
+          ...updateFields,
+          updatedAt: new Date()
         },
+        $setOnInsert: {
+          property_id: propertyId,
+          room_type_id: roomTypeId,
+          date: date,
+          sold: 0,
+          available: updates.allotment || 0,  // available = allotment for new records
+          createdAt: new Date()
+        }
       },
-      upsert: true,
-    },
+      upsert: true
+    }
   }));
 
   return this.bulkWrite(bulkOps);
@@ -286,6 +300,74 @@ InventorySchema.statics.updateOnCancellation = async function (
       update: {
         $inc: { sold: -roomsBooked },
         $set: { updated_at: new Date() },
+      },
+    },
+  }));
+
+  return this.bulkWrite(bulkOps);
+};
+
+/**
+ * Increment sold count (alias for updateOnBooking)
+ */
+InventorySchema.statics.incrementSold = async function (
+  propertyId,
+  roomTypeId,
+  dates,
+  quantity = 1
+) {
+  // If dates is a date range object, extract dates
+  if (!Array.isArray(dates)) {
+    const startDate = dates.checkInDate || dates.start_date;
+    const endDate = dates.checkOutDate || dates.end_date;
+    return this.updateOnBooking(propertyId, roomTypeId, startDate, endDate, quantity);
+  }
+
+  // If dates is an array, use it directly
+  const bulkOps = dates.map((date) => ({
+    updateOne: {
+      filter: {
+        property_id: propertyId,
+        room_type_id: roomTypeId,
+        date: new Date(date),
+      },
+      update: {
+        $inc: { sold: quantity },
+        $set: { updatedAt: new Date() },
+      },
+    },
+  }));
+
+  return this.bulkWrite(bulkOps);
+};
+
+/**
+ * Decrement sold count (alias for updateOnCancellation)
+ */
+InventorySchema.statics.decrementSold = async function (
+  propertyId,
+  roomTypeId,
+  dates,
+  quantity = 1
+) {
+  // If dates is a date range object, extract dates
+  if (!Array.isArray(dates)) {
+    const startDate = dates.checkInDate || dates.start_date;
+    const endDate = dates.checkOutDate || dates.end_date;
+    return this.updateOnCancellation(propertyId, roomTypeId, startDate, endDate, quantity);
+  }
+
+  // If dates is an array, use it directly
+  const bulkOps = dates.map((date) => ({
+    updateOne: {
+      filter: {
+        property_id: propertyId,
+        room_type_id: roomTypeId,
+        date: new Date(date),
+      },
+      update: {
+        $inc: { sold: -quantity },
+        $set: { updatedAt: new Date() },
       },
     },
   }));

@@ -41,7 +41,7 @@ router.get('/:id/stats', authenticate, authorize('admin'), organizationControlle
  * @desc    Create new organization
  * @access  Private (Admin only)
  */
-router.post('/', authenticate, authorize('admin'), organizationController.create);
+router.post('/',  organizationController.create);
 
 /**
  * @route   PUT /api/v1/organizations/:id

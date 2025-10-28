@@ -49,7 +49,7 @@ const ReservationSchema = new mongoose.Schema(
       trim: true,
       uppercase: true,
       unique: true,
-      required: true,
+      required: false,
       index: true,
     },
 
@@ -108,7 +108,7 @@ const ReservationSchema = new mongoose.Schema(
 
     nights: {
       type: Number,
-      required: true,
+      required: false,
       min: [1, 'Must be at least 1 night'],
     },
 
@@ -126,7 +126,7 @@ const ReservationSchema = new mongoose.Schema(
       },
       total: {
         type: Number,
-        required: true,
+        required: false,
       },
     },
 

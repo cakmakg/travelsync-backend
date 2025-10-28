@@ -1,110 +1,109 @@
 "use strict";
 /* -------------------------------------------------------
-    TravelSync - Rate Plan Routes
+    TravelSync - Price Routes
 ------------------------------------------------------- */
 
 const express = require('express');
 const router = express.Router();
-const ratePlanController = require('../controllers/ratePlan');
+const priceController = require('../controllers/price');
 const { authenticate, authorize } = require('../middlewares/auth');
 
 /**
- * @route   GET /api/v1/rate-plans
- * @desc    Get all rate plans (with pagination, search, filter)
+ * @route   GET /api/v1/prices
+ * @desc    Get all prices (with pagination, search, filter)
  * @access  Private
  */
-router.get('/', authenticate, ratePlanController.getAll);
+router.get('/', authenticate, priceController.getAll);
 
 /**
- * @route   GET /api/v1/rate-plans/property/:propertyId
- * @desc    Get all rate plans for a property
+ * @route   GET /api/v1/prices/property/:propertyId
+ * @desc    Get all prices for a property
  * @access  Private
+ * @query   start_date, end_date, room_type_id, rate_plan_id, page, limit
  */
-router.get('/property/:propertyId', authenticate, ratePlanController.getByProperty);
+router.get('/property/:propertyId', authenticate, priceController.getByProperty);
 
 /**
- * @route   GET /api/v1/rate-plans/property/:propertyId/public
- * @desc    Get all public rate plans for a property
- * @access  Public
- */
-router.get('/property/:propertyId/public', ratePlanController.getPublic);
-
-/**
- * @route   GET /api/v1/rate-plans/base/:baseRatePlanId/derived
- * @desc    Get all derived rate plans from a base rate plan
+ * @route   GET /api/v1/prices/:propertyId/:roomTypeId/:ratePlanId/range
+ * @desc    Get prices for a date range
  * @access  Private
+ * @query   start_date, end_date
  */
-router.get('/base/:baseRatePlanId/derived', authenticate, ratePlanController.getDerived);
+router.get('/:propertyId/:roomTypeId/:ratePlanId/range', authenticate, priceController.getForDateRange);
 
 /**
- * @route   GET /api/v1/rate-plans/:id
- * @desc    Get rate plan by ID
+ * @route   GET /api/v1/prices/:propertyId/:roomTypeId/:ratePlanId/summary
+ * @desc    Get price summary (min, max, avg) for a date range
  * @access  Private
+ * @query   start_date, end_date
  */
-router.get('/:id', authenticate, ratePlanController.getById);
+router.get('/:propertyId/:roomTypeId/:ratePlanId/summary', authenticate, priceController.getPriceSummary);
 
 /**
- * @route   GET /api/v1/rate-plans/:id/stats
- * @desc    Get rate plan statistics
- * @access  Private
- */
-router.get('/:id/stats', authenticate, ratePlanController.getStats);
-
-/**
- * @route   GET /api/v1/rate-plans/:id/check-validity
- * @desc    Check if rate plan is valid for a specific date
+ * @route   GET /api/v1/prices/:propertyId/:roomTypeId/:ratePlanId/date
+ * @desc    Get price for a specific date
  * @access  Private
  * @query   date
  */
-router.get('/:id/check-validity', authenticate, ratePlanController.checkValidity);
+router.get('/:propertyId/:roomTypeId/:ratePlanId/date', authenticate, priceController.getForDate);
 
 /**
- * @route   POST /api/v1/rate-plans
- * @desc    Create new rate plan
+ * @route   GET /api/v1/prices/:id
+ * @desc    Get price by ID
+ * @access  Private
+ */
+router.get('/:id', authenticate, priceController.getById);
+
+/**
+ * @route   POST /api/v1/prices
+ * @desc    Create new price
  * @access  Private (Admin, Manager)
  */
-router.post('/', authenticate, authorize('admin', 'manager'), ratePlanController.create);
+router.post('/', authenticate, authorize('admin', 'manager'), priceController.create);
 
 /**
- * @route   PUT /api/v1/rate-plans/:id
- * @desc    Update rate plan
+ * @route   POST /api/v1/prices/bulk-upsert
+ * @desc    Bulk create or update prices
+ * @access  Private (Admin, Manager)
+ * @body    { prices: [{ property_id, room_type_id, rate_plan_id, date, amount, ... }] }
+ */
+router.post('/bulk-upsert', authenticate, authorize('admin', 'manager'), priceController.bulkUpsert);
+
+/**
+ * @route   PUT /api/v1/prices/:id
+ * @desc    Update price
  * @access  Private (Admin, Manager)
  */
-router.put('/:id', authenticate, authorize('admin', 'manager'), ratePlanController.update);
+router.put('/:id', authenticate, authorize('admin', 'manager'), priceController.update);
 
 /**
- * @route   PUT /api/v1/rate-plans/:id/toggle-active
- * @desc    Toggle rate plan active status
+ * @route   PUT /api/v1/prices/:propertyId/:roomTypeId/:ratePlanId/bulk-update
+ * @desc    Bulk update prices for a date range
  * @access  Private (Admin, Manager)
+ * @body    { start_date, end_date, amount?, is_available? }
  */
-router.put('/:id/toggle-active', authenticate, authorize('admin', 'manager'), ratePlanController.toggleActive);
+router.put('/:propertyId/:roomTypeId/:ratePlanId/bulk-update', authenticate, authorize('admin', 'manager'), priceController.bulkUpdateDateRange);
 
 /**
- * @route   PUT /api/v1/rate-plans/:id/toggle-public
- * @desc    Toggle rate plan public status
- * @access  Private (Admin, Manager)
- */
-router.put('/:id/toggle-public', authenticate, authorize('admin', 'manager'), ratePlanController.togglePublic);
-
-/**
- * @route   PUT /api/v1/rate-plans/:id/cancellation-policy
- * @desc    Update rate plan cancellation policy
- * @access  Private (Admin, Manager)
- */
-router.put('/:id/cancellation-policy', authenticate, authorize('admin', 'manager'), ratePlanController.updateCancellationPolicy);
-
-/**
- * @route   DELETE /api/v1/rate-plans/:id
- * @desc    Soft delete rate plan
+ * @route   DELETE /api/v1/prices/:id
+ * @desc    Soft delete price
  * @access  Private (Admin only)
  */
-router.delete('/:id', authenticate, authorize('admin'), ratePlanController.delete);
+router.delete('/:id', authenticate, authorize('admin'), priceController.delete);
 
 /**
- * @route   POST /api/v1/rate-plans/:id/restore
- * @desc    Restore soft deleted rate plan
+ * @route   DELETE /api/v1/prices/:propertyId/:roomTypeId/:ratePlanId/range
+ * @desc    Delete prices for a date range
+ * @access  Private (Admin only)
+ * @body    { start_date, end_date }
+ */
+router.delete('/:propertyId/:roomTypeId/:ratePlanId/range', authenticate, authorize('admin'), priceController.deleteDateRange);
+
+/**
+ * @route   POST /api/v1/prices/:id/restore
+ * @desc    Restore soft deleted price
  * @access  Private (Admin only)
  */
-router.post('/:id/restore', authenticate, authorize('admin'), ratePlanController.restore);
+router.post('/:id/restore', authenticate, authorize('admin'), priceController.restore);
 
 module.exports = router;

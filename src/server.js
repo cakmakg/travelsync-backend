@@ -13,11 +13,32 @@ const compression = require('compression');
 // Load environment variables
 dotenv.config();
 
+// ============================================
+// CRITICAL: Error handlers MUST be at the top!
+// ============================================
+
+// Handle uncaught exceptions (MUST BE FIRST!)
+process.on('uncaughtException', (err) => {
+  console.error('❌ UNCAUGHT EXCEPTION! 💥 Shutting down...');
+  console.error('Error name:', err.name);
+  console.error('Error message:', err.message);
+  console.error('Stack:', err.stack);
+  process.exit(1);
+});
+
+// Handle unhandled rejections
+process.on('unhandledRejection', (err) => {
+  console.error('❌ UNHANDLED REJECTION! 💥 Shutting down...');
+  console.error('Error name:', err.name);
+  console.error('Error message:', err.message);
+  process.exit(1);
+});
+
 // Import configurations
 const { connectDatabase } = require('./config/database');
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5001;  // ✅ Changed from 5000 to 8000
 
 // ============================================
 // MIDDLEWARE
@@ -56,12 +77,9 @@ app.get('/health', (req, res) => {
     success: true,
     message: 'TravelSync API is running',
     timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV,
+    environment: process.env.NODE_ENV || 'development',
   });
 });
-
-// API Routes
-app.use('/api/v1/auth', require('./routes/auth'));
 
 // Welcome route
 app.get('/', (req, res) => {
@@ -72,9 +90,28 @@ app.get('/', (req, res) => {
     endpoints: {
       health: '/health',
       auth: '/api/v1/auth',
+      organizations: '/api/v1/organizations',
+      users: '/api/v1/users',
+      properties: '/api/v1/properties',
+      roomTypes: '/api/v1/room-types',
+      ratePlans: '/api/v1/rate-plans',
+      prices: '/api/v1/prices',
+      inventory: '/api/v1/inventory',
+      reservations: '/api/v1/reservations',
     },
   });
 });
+
+// API Routes
+app.use('/api/v1/auth', require('./routes/auth'));
+app.use('/api/v1/organizations', require('./routes/organization'));
+app.use('/api/v1/users', require('./routes/user'));
+app.use('/api/v1/properties', require('./routes/property'));
+app.use('/api/v1/room-types', require('./routes/roomType'));
+app.use('/api/v1/rate-plans', require('./routes/ratePlan'));
+app.use('/api/v1/prices', require('./routes/price'));
+app.use('/api/v1/inventory', require('./routes/inventory'));
+app.use('/api/v1/reservations', require('./routes/reservation'));
 
 // ============================================
 // ERROR HANDLING
@@ -96,16 +133,19 @@ app.use((err, req, res, next) => {
   let statusCode = 500;
   let message = 'Internal server error';
 
+  // Mongoose validation error
   if (err.name === 'ValidationError') {
     statusCode = 400;
     message = 'Validation error';
   }
 
+  // Mongoose duplicate key error
   if (err.name === 'MongoServerError' && err.code === 11000) {
     statusCode = 409;
     message = 'Duplicate field value entered';
   }
 
+  // JWT errors
   if (err.name === 'JsonWebTokenError') {
     statusCode = 401;
     message = 'Invalid token';
@@ -116,6 +156,13 @@ app.use((err, req, res, next) => {
     message = 'Token expired';
   }
 
+  // Mongoose CastError (invalid ObjectId)
+  if (err.name === 'CastError') {
+    statusCode = 400;
+    message = 'Invalid ID format';
+  }
+
+  // Log error in development
   if (process.env.NODE_ENV === 'development') {
     console.error('❌ Error:', {
       message: err.message,
@@ -128,7 +175,10 @@ app.use((err, req, res, next) => {
     success: false,
     error: {
       message,
-      ...(process.env.NODE_ENV === 'development' && { stack: err.stack }),
+      ...(process.env.NODE_ENV === 'development' && { 
+        stack: err.stack,
+        details: err.message 
+      }),
     },
   });
 });
@@ -143,7 +193,7 @@ const startServer = async () => {
     await connectDatabase();
     
     // Start server
-    app.listen(PORT, () => {
+    const server = app.listen(PORT, () => {
       console.log(`
 ╔═══════════════════════════════════════════╗
 ║                                           ║
@@ -154,38 +204,46 @@ const startServer = async () => {
 ║  Database:    Connected ✓                 ║
 ║                                           ║
 ║  🔗 API Endpoints:                        ║
-║  ├─ Health:   /health                     ║
-║  ├─ Auth:     /api/v1/auth                ║
-║  │   ├─ POST  /register                   ║
-║  │   ├─ POST  /login                      ║
-║  │   ├─ GET   /me                         ║
-║  │   ├─ POST  /refresh                    ║
-║  │   └─ POST  /logout                     ║
+║  ├─ Health:        /health                ║
+║  ├─ Auth:          /api/v1/auth           ║
+║  ├─ Organizations: /api/v1/organizations  ║
+║  ├─ Users:         /api/v1/users          ║
+║  ├─ Properties:    /api/v1/properties     ║
+║  ├─ Room Types:    /api/v1/room-types     ║
+║  ├─ Rate Plans:    /api/v1/rate-plans     ║
+║  ├─ Prices:        /api/v1/prices         ║
+║  ├─ Inventory:     /api/v1/inventory      ║
+║  └─ Reservations:  /api/v1/reservations   ║
+║                                           ║
+║  🚀 Server is ready to accept requests!  ║
 ║                                           ║
 ╚═══════════════════════════════════════════╝
       `);
     });
+
+    // Graceful shutdown
+    process.on('SIGTERM', () => {
+      console.log('👋 SIGTERM received. Shutting down gracefully...');
+      server.close(() => {
+        console.log('✅ Server closed');
+        process.exit(0);
+      });
+    });
+
+    process.on('SIGINT', () => {
+      console.log('\n👋 SIGINT received. Shutting down gracefully...');
+      server.close(() => {
+        console.log('✅ Server closed');
+        process.exit(0);
+      });
+    });
+
   } catch (error) {
     console.error('❌ Failed to start server:', error);
     process.exit(1);
   }
 };
 
-// Handle unhandled rejections
-process.on('unhandledRejection', (err) => {
-  console.error('UNHANDLED REJECTION! 💥 Shutting down...');
-  console.error(err.name, err.message);
-  process.exit(1);
-});
-
-// Handle uncaught exceptions
-process.on('uncaughtException', (err) => {
-  console.error('UNCAUGHT EXCEPTION! 💥 Shutting down...');
-  console.error(err.name, err.message);
-  process.exit(1);
-});
-
 // Start the server
 startServer();
-
 module.exports = app;

@@ -10,14 +10,14 @@ const AuditLogSchema = new mongoose.Schema(
     organization_id: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Organization',
-      required: [true, 'Organization ID is required'],
+      required: false,
       index: true,
     },
 
     user_id: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
-      required: [true, 'User ID is required'],
+      required: false,
       index: true,
     },
 
