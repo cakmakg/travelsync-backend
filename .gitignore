@@ -43,4 +43,5 @@ temp/
 # Debug
 debug.log
 
-API_DESIGN.md
+docs/API_DESIGN.md
+
