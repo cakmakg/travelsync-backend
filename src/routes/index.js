@@ -23,4 +23,6 @@ module.exports = {
   price: require('./price'),
   inventory: require('./inventory'),
   reservation: require('./reservation'),
+  Agency: require('./agency'),              
+  AgencyContract: require('./agencyContract')
 };

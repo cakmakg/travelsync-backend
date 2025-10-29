@@ -179,11 +179,17 @@ const ReservationSchema = new mongoose.Schema(
     // Booking source
     source: {
       type: String,
-      enum: ['DIRECT', 'PHONE', 'EMAIL', 'OTA', 'AGENCY'],
+      enum: ['DIRECT', 'PHONE', 'EMAIL', 'OTA', 'AGENCY', 'GDS'],
       default: 'DIRECT',
       required: true,
       index: true,
     },
+    agency_id: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Agency',
+      index: true,
+    },
+    agency_booking_ref: String,
 
     // External reference (from OTA or agency)
     external_ref: {
@@ -205,6 +211,18 @@ const ReservationSchema = new mongoose.Schema(
         default: 0,
         get: (value) => (value ? parseFloat(value.toString()) : 0),
       },
+      currency: String,
+      status: {
+        type: String,
+        enum: ['PENDING', 'INVOICED', 'PAID'],
+        default: 'PENDING',
+      },
+      paid_date: Date,
+    },
+    payment_responsibility: {
+      type: String,
+      enum: ['GUEST', 'AGENCY', 'SPLIT'],
+      default: 'GUEST',
     },
 
     // Payment information
@@ -338,12 +356,25 @@ ReservationSchema.methods.getTotalWithTax = function () {
   return parseFloat(this.total_with_tax.toString());
 };
 
-ReservationSchema.methods.calculateCommission = function () {
-  if (this.commission.percentage > 0) {
-    const total = this.getTotalPrice();
-    this.commission.amount = (total * this.commission.percentage) / 100;
-  }
-  return this.commission.amount;
+ReservationSchema.methods.calculateCommission = async function () {
+  if (!this.agency_id) return 0;
+
+  const Agency = require('./Agency');
+  const agency = await Agency.findById(this.agency_id);
+  if (!agency) return 0;
+
+  const rate = agency.getCommissionRate(this.property_id);
+  const amount = (this.total_price * rate) / 100;
+
+  this.commission = {
+    percentage: rate,
+    amount,
+    currency: this.currency,
+    status: 'PENDING',
+  };
+
+  await this.save();
+  return amount;
 };
 
 // Statics

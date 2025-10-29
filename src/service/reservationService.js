@@ -5,7 +5,7 @@
  * Features: Availability check, price calculation, inventory management
  */
 
-const { Reservation, Inventory, Price, RoomType, RatePlan, AuditLog } = require('../models');
+const { Reservation, Inventory, Price, RoomType, RatePlan, AuditLog, Agency } = require('../models');
 
 class ReservationService {
   /**

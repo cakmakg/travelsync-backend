@@ -203,14 +203,8 @@ InventorySchema.statics.bulkUpdateInventory = async function (
     currentDate.setDate(currentDate.getDate() + 1);
   }
 
-  // Calculate available if allotment is provided
-  const updateFields = { ...updates };
-  if (updates.allotment !== undefined) {
-    // For upsert: available = allotment - sold (sold will be 0 for new records)
-    // For update: we need to calculate available based on existing sold value
-    updateFields.available = updates.allotment; // Initial value for new records
-  }
-
+  // For existing records: Update using $set and calculate available in a separate operation
+  // For new records: Set available in $setOnInsert
   const bulkOps = dates.map(date => ({
     updateOne: {
       filter: {
@@ -220,7 +214,7 @@ InventorySchema.statics.bulkUpdateInventory = async function (
       },
       update: { 
         $set: {
-          ...updateFields,
+          ...updates,
           updatedAt: new Date()
         },
         $setOnInsert: {
@@ -228,7 +222,7 @@ InventorySchema.statics.bulkUpdateInventory = async function (
           room_type_id: roomTypeId,
           date: date,
           sold: 0,
-          available: updates.allotment || 0,  // available = allotment for new records
+          available: updates.allotment || 0,
           createdAt: new Date()
         }
       },
@@ -236,7 +230,30 @@ InventorySchema.statics.bulkUpdateInventory = async function (
     }
   }));
 
-  return this.bulkWrite(bulkOps);
+  const result = await this.bulkWrite(bulkOps);
+
+  // For updated records, recalculate available field
+  if (updates.allotment !== undefined && result.modifiedCount > 0) {
+    await this.updateMany(
+      {
+        property_id: propertyId,
+        room_type_id: roomTypeId,
+        date: { $in: dates }
+      },
+      [{
+        $set: {
+          available: {
+            $subtract: [
+              { $ifNull: ['$allotment', 0] },
+              { $ifNull: ['$sold', 0] }
+            ]
+          }
+        }
+      }]
+    );
+  }
+
+  return result;
 };
 
 InventorySchema.statics.updateOnBooking = async function (
