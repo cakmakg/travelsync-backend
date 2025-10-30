@@ -7,7 +7,7 @@
 
 const BaseController = require('./base');
 const { Reservation } = require('../models');
-const reservationService = require('../service/reservationService');
+const reservationService = require('../services/reservation.service');
 
 class ReservationController extends BaseController {
   constructor() {
@@ -35,15 +35,15 @@ class ReservationController extends BaseController {
       };
 
       // Use service for complex logic
-      const result = await reservationService.createReservation(
+      const reservation = await reservationService.createReservation(
         data,
         req.user?._id
       );
-
+      //pricing: reservation,
       res.status(201).json({
         success: true,
-        data: result.reservation,
-        pricing: result.pricing,
+        data: reservation,
+        
         message: 'Reservation created successfully'
       });
     } catch (error) {

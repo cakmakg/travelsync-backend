@@ -14,4 +14,6 @@ module.exports = {
   Inventory: require('./Inventory'),
   Reservation: require('./Reservation'),
   AuditLog: require('./Auditlog'),
+   Agency: require('./Agency'),
+  AgencyContract: require('./AgencyContract'),
 };

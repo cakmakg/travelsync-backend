@@ -1,85 +1,321 @@
 "use strict";
 /* -------------------------------------------------------
-    TravelSync - Agency Controller
+    TravelSync - Agency Controller (FIXED with Error Handling)
 ------------------------------------------------------- */
 
 const { Agency } = require('../models');
-const baseCRUD = require('./base');
-
-const crud = baseCRUD.createCRUDController(Agency, 'Agency');
+const reservationService = require('../services/reservation.service');
 
 module.exports = {
-  ...crud,
+  /**
+   * Get all agencies
+   */
+  getAll: async (req, res) => {
+    try {
+      const { page = 1, limit = 50, search, type, is_active } = req.query;
+      const skip = (page - 1) * limit;
 
-  // Get agency bookings
-  getBookings: async (req, res) => {
-    const { Reservation } = require('../models');
-    
-    const bookings = await Reservation.find({
-      agency_id: req.params.id,
-    })
-      .populate('property_id', 'name code')
-      .populate('room_type_id', 'name')
-      .sort({ createdAt: -1 });
+      const query = { organization_id: req.user.organization_id };
 
-    res.json({ success: true, data: bookings });
-  },
-
-  // Get commission report
-  getCommissionReport: async (req, res) => {
-    const { Reservation } = require('../models');
-    const { start_date, end_date, status } = req.query;
-
-    const query = {
-      agency_id: req.params.id,
-      check_in_date: {
-        $gte: new Date(start_date || '2024-01-01'),
-        $lte: new Date(end_date || new Date()),
-      },
-    };
-
-    if (status) {
-      query['commission.status'] = status;
-    }
-
-    const bookings = await Reservation.find(query);
-
-    const report = {
-      total_bookings: bookings.length,
-      total_revenue: bookings.reduce((sum, b) => sum + b.total_price, 0),
-      total_commission: bookings.reduce((sum, b) => sum + (b.commission?.amount || 0), 0),
-      pending_commission: bookings
-        .filter(b => b.commission?.status === 'PENDING')
-        .reduce((sum, b) => sum + (b.commission?.amount || 0), 0),
-      paid_commission: bookings
-        .filter(b => b.commission?.status === 'PAID')
-        .reduce((sum, b) => sum + (b.commission?.amount || 0), 0),
-    };
-
-    res.json({ success: true, data: report });
-  },
-
-  // Mark commission as paid
-  markCommissionPaid: async (req, res) => {
-    const { Reservation } = require('../models');
-    const { booking_ids } = req.body;
-
-    await Reservation.updateMany(
-      {
-        _id: { $in: booking_ids },
-        agency_id: req.params.id,
-      },
-      {
-        $set: {
-          'commission.status': 'PAID',
-          'commission.paid_date': new Date(),
-        },
+      if (search) {
+        query.$or = [
+          { name: { $regex: search, $options: 'i' } },
+          { code: { $regex: search, $options: 'i' } },
+        ];
       }
-    );
 
-    res.json({
-      success: true,
-      message: `Commission marked as paid for ${booking_ids.length} bookings`,
-    });
+      if (type) query.type = type;
+      if (is_active !== undefined) query.is_active = is_active === 'true';
+
+      const [agencies, total] = await Promise.all([
+        Agency.find(query)
+          .sort({ createdAt: -1 })
+          .skip(skip)
+          .limit(Number(limit))
+          .lean(),
+        Agency.countDocuments(query),
+      ]);
+
+      res.json({
+        success: true,
+        data: agencies,
+        pagination: {
+          total,
+          page: Number(page),
+          limit: Number(limit),
+          pages: Math.ceil(total / limit),
+        },
+      });
+    } catch (error) {
+      console.error('[Agency] GetAll error:', error);
+      res.status(500).json({
+        success: false,
+        error: { message: error.message || 'Failed to fetch agencies' },
+      });
+    }
+  },
+
+  /**
+   * Get agency by ID
+   */
+  getById: async (req, res) => {
+    try {
+      const agency = await Agency.findOne({
+        _id: req.params.id,
+        organization_id: req.user.organization_id,
+      });
+
+      if (!agency) {
+        return res.status(404).json({
+          success: false,
+          error: { message: 'Agency not found' },
+        });
+      }
+
+      res.json({ success: true, data: agency });
+    } catch (error) {
+      console.error('[Agency] GetById error:', error);
+      res.status(500).json({
+        success: false,
+        error: { message: error.message || 'Failed to fetch agency' },
+      });
+    }
+  },
+
+  /**
+   * Create agency
+   */
+  create: async (req, res) => {
+    try {
+      const agencyData = {
+        ...req.body,
+        organization_id: req.user.organization_id,
+      };
+
+      // Validate commission percentage
+      if (agencyData.commission?.default_percentage) {
+        const rate = agencyData.commission.default_percentage;
+        if (rate < 0 || rate > 50) {
+          return res.status(400).json({
+            success: false,
+            error: { message: 'Commission percentage must be between 0 and 50' },
+          });
+        }
+      }
+
+      // Check for duplicate code
+      const existing = await Agency.findOne({
+        organization_id: req.user.organization_id,
+        code: agencyData.code,
+      });
+
+      if (existing) {
+        return res.status(400).json({
+          success: false,
+          error: { message: 'Agency code already exists' },
+        });
+      }
+
+      const agency = await Agency.create(agencyData);
+
+      res.status(201).json({
+        success: true,
+        data: agency,
+        message: 'Agency created successfully',
+      });
+    } catch (error) {
+      console.error('[Agency] Create error:', error);
+      res.status(500).json({
+        success: false,
+        error: { message: error.message || 'Failed to create agency' },
+      });
+    }
+  },
+
+  /**
+   * Update agency
+   */
+  update: async (req, res) => {
+    try {
+      const agency = await Agency.findOneAndUpdate(
+        {
+          _id: req.params.id,
+          organization_id: req.user.organization_id,
+        },
+        req.body,
+        { new: true, runValidators: true }
+      );
+
+      if (!agency) {
+        return res.status(404).json({
+          success: false,
+          error: { message: 'Agency not found' },
+        });
+      }
+
+      res.json({
+        success: true,
+        data: agency,
+        message: 'Agency updated successfully',
+      });
+    } catch (error) {
+      console.error('[Agency] Update error:', error);
+      res.status(500).json({
+        success: false,
+        error: { message: error.message || 'Failed to update agency' },
+      });
+    }
+  },
+
+  /**
+   * Delete agency (soft delete)
+   */
+  delete: async (req, res) => {
+    try {
+      const agency = await Agency.findOneAndUpdate(
+        {
+          _id: req.params.id,
+          organization_id: req.user.organization_id,
+        },
+        { is_active: false },
+        { new: true }
+      );
+
+      if (!agency) {
+        return res.status(404).json({
+          success: false,
+          error: { message: 'Agency not found' },
+        });
+      }
+
+      res.json({
+        success: true,
+        data: agency,
+        message: 'Agency deactivated successfully',
+      });
+    } catch (error) {
+      console.error('[Agency] Delete error:', error);
+      res.status(500).json({
+        success: false,
+        error: { message: error.message || 'Failed to delete agency' },
+      });
+    }
+  },
+
+  /**
+   * Get agency bookings
+   */
+  getBookings: async (req, res) => {
+    try {
+      const agency = await Agency.findOne({
+        _id: req.params.id,
+        organization_id: req.user.organization_id,
+      });
+
+      if (!agency) {
+        return res.status(404).json({
+          success: false,
+          error: { message: 'Agency not found' },
+        });
+      }
+
+      const result = await reservationService.getAgencyBookings(
+        req.params.id,
+        req.query
+      );
+
+      res.json({
+        success: true,
+        data: result.bookings,
+        pagination: result.pagination,
+      });
+    } catch (error) {
+      console.error('[Agency] GetBookings error:', error);
+      res.status(500).json({
+        success: false,
+        error: { message: error.message || 'Failed to fetch bookings' },
+      });
+    }
+  },
+
+  /**
+   * Get commission report
+   */
+  getCommissionReport: async (req, res) => {
+    try {
+      const agency = await Agency.findOne({
+        _id: req.params.id,
+        organization_id: req.user.organization_id,
+      });
+
+      if (!agency) {
+        return res.status(404).json({
+          success: false,
+          error: { message: 'Agency not found' },
+        });
+      }
+
+      const report = await reservationService.getCommissionReport(
+        req.params.id,
+        req.query
+      );
+
+      res.json({
+        success: true,
+        data: report,
+      });
+    } catch (error) {
+      console.error('[Agency] GetCommissionReport error:', error);
+      res.status(500).json({
+        success: false,
+        error: { message: error.message || 'Failed to generate report' },
+      });
+    }
+  },
+
+  /**
+   * Mark commission as paid
+   */
+  markCommissionPaid: async (req, res) => {
+    try {
+      const { booking_ids } = req.body;
+
+      if (!Array.isArray(booking_ids) || booking_ids.length === 0) {
+        return res.status(400).json({
+          success: false,
+          error: { message: 'booking_ids array is required' },
+        });
+      }
+
+      const agency = await Agency.findOne({
+        _id: req.params.id,
+        organization_id: req.user.organization_id,
+      });
+
+      if (!agency) {
+        return res.status(404).json({
+          success: false,
+          error: { message: 'Agency not found' },
+        });
+      }
+
+      const result = await reservationService.markCommissionPaid(
+        req.params.id,
+        booking_ids,
+        req.user
+      );
+
+      res.json({
+        success: true,
+        data: result,
+        message: result.message,
+      });
+    } catch (error) {
+      console.error('[Agency] MarkCommissionPaid error:', error);
+      res.status(500).json({
+        success: false,
+        error: { message: error.message || 'Failed to mark commission as paid' },
+      });
+    }
   },
 };

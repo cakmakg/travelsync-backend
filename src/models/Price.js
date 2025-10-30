@@ -1,6 +1,6 @@
 "use strict";
 /* -------------------------------------------------------
-    TravelSync - Price Model
+    TravelSync - Price Model (TIMEZONE FIXED)
 ------------------------------------------------------- */
 
 const { mongoose } = require('../config/database');
@@ -80,7 +80,7 @@ const PriceSchema = new mongoose.Schema(
 // INDEXES
 // ============================================
 
-// Compound unique index - one price per property/room/rate/date combination
+// Compound unique index
 PriceSchema.index(
   {
     property_id: 1,
@@ -97,8 +97,85 @@ PriceSchema.index({ room_type_id: 1, date: 1 });
 PriceSchema.index({ rate_plan_id: 1, date: 1 });
 
 // ============================================
-// STATIC METHODS
+// STATIC METHOD: Calculate Total Price (TIMEZONE FIXED)
 // ============================================
+PriceSchema.statics.calculateTotalPrice = async function (
+  propertyId,
+  roomTypeId,
+  ratePlanId,
+  startDate,
+  endDate,
+  rooms = 1
+) {
+  const dates = [];
+  
+  // Parse dates and work in UTC to avoid timezone issues
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  
+  // Set to noon UTC to avoid DST and timezone shifts
+  start.setUTCHours(12, 0, 0, 0);
+  end.setUTCHours(12, 0, 0, 0);
+
+  // Generate date array (check-in to check-out, excluding check-out day)
+  const currentDate = new Date(start);
+  
+  while (currentDate < end) {
+    // Create date at midnight UTC for MongoDB query
+    const dateForQuery = new Date(currentDate);
+    dateForQuery.setUTCHours(0, 0, 0, 0);
+    dates.push(dateForQuery);
+    
+    // Increment by 1 day using UTC methods
+    currentDate.setUTCDate(currentDate.getUTCDate() + 1);
+  }
+
+  if (dates.length === 0) {
+    throw new Error('Invalid date range: check-in must be before check-out');
+  }
+
+  console.log('[Price] Searching for dates:', dates.map(d => d.toISOString().split('T')[0]));
+
+  // Find prices for all dates
+  const prices = await this.find({
+    property_id: propertyId,
+    room_type_id: roomTypeId,
+    rate_plan_id: ratePlanId,
+    date: { $in: dates },
+    is_available: true,
+  }).lean();
+
+  console.log('[Price] Found:', prices.length, '/', dates.length);
+
+  // Check if all dates have prices
+  if (prices.length !== dates.length) {
+    const foundDates = prices.map(p => p.date.toISOString().split('T')[0]);
+    const missingDates = dates
+      .filter(d => !foundDates.includes(d.toISOString().split('T')[0]))
+      .map(d => d.toISOString().split('T')[0]);
+    
+    console.log('[Price] Missing dates:', missingDates);
+    throw new Error(`Price not found for dates: ${missingDates.join(', ')}`);
+  }
+
+  // Calculate total
+  const subtotal = prices.reduce((sum, price) => sum + (price.amount || 0), 0);
+  const total = subtotal * rooms;
+
+  console.log('[Price] Total calculated:', total);
+
+  return {
+    total,
+    subtotal,
+    rooms,
+    nights: dates.length,
+    currency: prices[0]?.currency || 'EUR',
+    daily_prices: prices.map(p => ({
+      date: p.date,
+      amount: p.amount,
+    })),
+  };
+};
 
 /**
  * Find prices for date range
@@ -123,7 +200,7 @@ PriceSchema.statics.findForDateRange = async function(
 };
 
 /**
- * Bulk upsert prices (create or update multiple prices)
+ * Bulk upsert prices
  */
 PriceSchema.statics.bulkUpsertPrices = async function(prices) {
   if (!Array.isArray(prices) || prices.length === 0) {

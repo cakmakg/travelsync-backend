@@ -98,6 +98,8 @@ app.get('/', (req, res) => {
       prices: '/api/v1/prices',
       inventory: '/api/v1/inventory',
       reservations: '/api/v1/reservations',
+       agencies: '/api/v1/agencies', 
+  agencyContracts: '/api/v1/agency-contracts',
     },
   });
 });
@@ -112,6 +114,10 @@ app.use('/api/v1/rate-plans', require('./routes/ratePlan'));
 app.use('/api/v1/prices', require('./routes/price'));
 app.use('/api/v1/inventory', require('./routes/inventory'));
 app.use('/api/v1/reservations', require('./routes/reservation'));
+
+// Phase 2: Agency Routes
+app.use('/api/v1/agencies', require('./routes/agency'));
+app.use('/api/v1/agency-contracts', require('./routes/agencyContract')); 
 
 
 // ============================================

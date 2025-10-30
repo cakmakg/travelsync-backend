@@ -23,6 +23,6 @@ module.exports = {
   price: require('./price'),
   inventory: require('./inventory'),
   reservation: require('./reservation'),
-  Agency: require('./agency'),              
-  AgencyContract: require('./agencyContract')
+  agency: require('./agency'),              // ✅ Küçük harf!
+  agencyContract: require('./agencyContract')  // ✅ Küçük harf!
 };
