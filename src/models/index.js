@@ -14,6 +14,12 @@ module.exports = {
   Inventory: require('./Inventory'),
   Reservation: require('./Reservation'),
   AuditLog: require('./Auditlog'),
-   Agency: require('./Agency'),
+  Agency: require('./Agency'),
   AgencyContract: require('./AgencyContract'),
+  // B2C Models (Skeleton - Ready for future implementation)
+  Traveler: require('./Traveler'),
+  Trip: require('./Trip'),
+  Payment: require('./Payment'),
+  Review: require('./Review'),
+  Wishlist: require('./Wishlist'),
 };

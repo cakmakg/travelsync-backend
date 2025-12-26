@@ -29,13 +29,9 @@ const ReservationSchema = new mongoose.Schema(
       index: true,
     },
 
-    // For agency bookings
-    organization_id: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Organization',
-      default: null,
-      comment: 'If booking is made by an agency',
-    },
+    // Note: organization_id is not stored here.
+    // Reservation always belongs to hotel's organization (property.organization_id)
+    // For agency bookings, use agency_id field
 
     created_by_user_id: {
       type: mongoose.Schema.Types.ObjectId,
@@ -50,7 +46,7 @@ const ReservationSchema = new mongoose.Schema(
       uppercase: true,
       unique: true,
       required: false,
-      index: true,
+      // Index defined below in schema.index()
     },
 
     // Idempotency key to prevent duplicate bookings
@@ -59,7 +55,7 @@ const ReservationSchema = new mongoose.Schema(
       trim: true,
       unique: true,
       sparse: true,
-      index: true,
+      // Index defined below in schema.index()
     },
 
     // Guest information
@@ -309,8 +305,8 @@ ReservationSchema.pre('save', function (next) {
 });
 
 // Indexes
-ReservationSchema.index({ booking_reference: 1 }, { unique: true });
-ReservationSchema.index({ idempotency_key: 1 }, { unique: true, sparse: true });
+// Note: booking_reference and idempotency_key already have indexes from unique: true
+// No need to define them again with schema.index()
 ReservationSchema.index({ property_id: 1, check_in_date: 1 });
 ReservationSchema.index({ property_id: 1, status: 1 });
 ReservationSchema.index({ 'guest.email': 1 });

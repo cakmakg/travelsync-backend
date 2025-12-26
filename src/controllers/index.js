@@ -1,32 +1,25 @@
-/**
- * 🎯 CONTROLLERS INDEX
- * 
- * Export all controllers from a single file
- */
-
-// Base controller (optional export)
-const BaseController = require('./base');
-
-// Simple CRUD controllers
-const organizationController = require('./organization');
-const userController = require('./user');
-const propertyController = require('./property');
-const roomTypeController = require('./roomType');
-const ratePlanController = require('./ratePlan');
-
-// Complex controllers with services
-const priceController = require('./price');
-const inventoryController = require('./inventory');
-const reservationController = require('./reservation');
+"use strict";
+/* -------------------------------------------------------
+    TravelSync - Controllers Index
+    Central export point for all controllers
+------------------------------------------------------- */
 
 module.exports = {
-  BaseController,
-  organizationController,
-  userController,
-  propertyController,
-  roomTypeController,
-  ratePlanController,
-  priceController,
-  inventoryController,
-  reservationController
+  // B2B Controllers
+  organizationController: require('./organization'),
+  userController: require('./user'),
+  propertyController: require('./property'),
+  roomTypeController: require('./roomType'),
+  ratePlanController: require('./ratePlan'),
+  priceController: require('./price'),
+  inventoryController: require('./inventory'),
+  reservationController: require('./reservation'),
+  agencyController: require('./agency'),
+  agencyContractController: require('./agencyContract'),
+  authController: require('./auth'),
+  
+  // B2C Controllers (Skeleton - Ready for future implementation)
+  travelerController: require('./traveler'),
+  tripController: require('./trip'),
+  reviewController: require('./review'),
 };

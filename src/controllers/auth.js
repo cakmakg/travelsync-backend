@@ -86,17 +86,13 @@ const register = async (req, res) => {
       phone,
     });
 
-    // Log action
-    await AuditLog.logAction({
-      organization_id,
-      user_id: user._id,
+    // Log action (non-fatal)
+    await require('../services/audit.service').logAction({
       action: 'CREATE',
       entity_type: 'user',
       entity_id: user._id,
       description: 'User registered',
-      ip_address: req.ip,
-      user_agent: req.headers['user-agent'],
-    });
+    }, { _id: user._id, organization_id, ip: req.ip, user_agent: req.headers['user-agent'] });
 
     // Generate tokens
     const tokens = generateTokens(user);
@@ -193,17 +189,13 @@ const login = async (req, res) => {
     // Update last login
     await user.updateLastLogin();
 
-    // Log action
-    await AuditLog.logAction({
-      organization_id: user.organization_id,
-      user_id: user._id,
+    // Log action (non-fatal)
+    await require('../services/audit.service').logAction({
       action: 'LOGIN',
       entity_type: 'user',
       entity_id: user._id,
       description: 'User logged in',
-      ip_address: req.ip,
-      user_agent: req.headers['user-agent'],
-    });
+    }, { _id: user._id, organization_id: user.organization_id, ip: req.ip, user_agent: req.headers['user-agent'] });
 
     // Generate tokens
     const tokens = generateTokens(user);

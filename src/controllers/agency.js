@@ -1,86 +1,62 @@
 "use strict";
 /* -------------------------------------------------------
-    TravelSync - Agency Controller (FIXED with Error Handling)
+    TravelSync - Agency Controller
+    Clean code with helper functions and middleware
 ------------------------------------------------------- */
 
 const { Agency } = require('../models');
 const reservationService = require('../services/reservation.service');
+const asyncHandler = require('../middlewares/asyncHandler');
+const { buildQuery } = require('../utils/queryBuilder');
 
 module.exports = {
   /**
    * Get all agencies
    */
-  getAll: async (req, res) => {
-    try {
-      const { page = 1, limit = 50, search, type, is_active } = req.query;
-      const skip = (page - 1) * limit;
+  getAll: asyncHandler(async (req, res) => {
+    const { query, pagination, sort } = buildQuery(req.query, {
+      searchFields: ['name', 'code'],
+      filterFields: ['type', 'is_active'],
+      defaultSort: '-created_at',
+    });
 
-      const query = { organization_id: req.user.organization_id };
+    // Add organization filter
+    query.organization_id = req.user.organization_id;
 
-      if (search) {
-        query.$or = [
-          { name: { $regex: search, $options: 'i' } },
-          { code: { $regex: search, $options: 'i' } },
-        ];
-      }
-
-      if (type) query.type = type;
-      if (is_active !== undefined) query.is_active = is_active === 'true';
-
-      const [agencies, total] = await Promise.all([
-        Agency.find(query)
-          .sort({ createdAt: -1 })
-          .skip(skip)
-          .limit(Number(limit))
-          .lean(),
-        Agency.countDocuments(query),
-      ]);
-
-      res.json({
-        success: true,
-        data: agencies,
-        pagination: {
-          total,
-          page: Number(page),
-          limit: Number(limit),
-          pages: Math.ceil(total / limit),
-        },
-      });
-    } catch (error) {
-      console.error('[Agency] GetAll error:', error);
-      res.status(500).json({
-        success: false,
-        error: { message: error.message || 'Failed to fetch agencies' },
-      });
+    // Handle is_active boolean conversion
+    if (query.is_active !== undefined) {
+      query.is_active = query.is_active === 'true';
     }
-  },
+
+    const [agencies, total] = await Promise.all([
+      Agency.find(query).sort(sort).skip(pagination.skip).limit(pagination.limit).lean(),
+      Agency.countDocuments(query),
+    ]);
+
+    return res.success(agencies, {
+      pagination: {
+        ...pagination,
+        total,
+        pages: Math.ceil(total / pagination.limit),
+      },
+    });
+  }),
 
   /**
    * Get agency by ID
    */
-  getById: async (req, res) => {
-    try {
-      const agency = await Agency.findOne({
-        _id: req.params.id,
-        organization_id: req.user.organization_id,
-      });
+  getById: asyncHandler(async (req, res) => {
+    const agency = await Agency.findOne({
+      _id: req.params.id,
+      organization_id: req.user.organization_id,
+    });
 
-      if (!agency) {
-        return res.status(404).json({
-          success: false,
-          error: { message: 'Agency not found' },
-        });
-      }
-
-      res.json({ success: true, data: agency });
-    } catch (error) {
-      console.error('[Agency] GetById error:', error);
-      res.status(500).json({
-        success: false,
-        error: { message: error.message || 'Failed to fetch agency' },
-      });
+    if (!agency) {
+      return res.notFound('Agency not found');
     }
-  },
+
+    return res.success(agency);
+  }),
 
   /**
    * Create agency

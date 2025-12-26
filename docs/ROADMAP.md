@@ -753,12 +753,19 @@ npm install date-fns lucide-react sonner
 - [ ] Create status page (optional)
 
 **Day 7: Security Audit**
-- [ ] Review authentication flow
-- [ ] Check CORS configuration
-- [ ] Review rate limiting
-- [ ] Check for SQL/NoSQL injection vulnerabilities
-- [ ] Check for XSS vulnerabilities
+- [ ] Review authentication flow (token lifetime, refresh, revocation)
+- [ ] Check CORS configuration (whitelist origins via `CORS_ORIGIN` env)
+- [ ] Implement rate limiting (use `express-rate-limit`; use Redis store in prod - e.g., Upstash)
+- [ ] Ensure secure headers (Helmet + HSTS; add Content-Security-Policy basics)
+- [ ] Enforce HTTPS & secure cookies (SameSite, `secure` flag in production)
+- [ ] Add input sanitization (express-mongo-sanitize, xss-clean) and strengthen validation via `express-validator`
+- [ ] Verify MongoDB Replica Set & test transactions (see `docs/MONGODB_TRANSACTIONS_REPLICA_SET.md`)
+- [ ] Run dependency audit and fix vulnerable packages (`npm audit`, consider Snyk)
+- [ ] Add CI security checks (run `npm audit` and/or Snyk scan on CI)
+- [ ] Add monitoring/alerts for rate-limit events and suspicious activity (logs to Sentry/Logtail)
 - [ ] Run OWASP ZAP scan (optional)
+
+> See `docs/MONGODB_TRANSACTIONS_REPLICA_SET.md` and project security checklist for implementation details.
 
 **✅ Sprint 5 Done:** App deployed to production, monitored
 

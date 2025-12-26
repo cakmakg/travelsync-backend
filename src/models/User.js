@@ -4,8 +4,8 @@
 ------------------------------------------------------- */
 
 const { mongoose } = require('../config/database');
-const passwordEncrypt = require('../helper/Passwordencrypt');
-const emailValidation = require('../helper/Emailvalidation');
+const { hashPassword } = require('../utils/password');
+const { isValidEmail } = require('../utils/email');
 
 const UserSchema = new mongoose.Schema(
   {
@@ -22,7 +22,7 @@ const UserSchema = new mongoose.Schema(
       lowercase: true,
       required: [true, 'Email address is required'],
       validate: [
-        (email) => emailValidation(email),
+        (email) => isValidEmail(email),
         'Email format is not valid',
       ],
     },
@@ -31,7 +31,6 @@ const UserSchema = new mongoose.Schema(
       type: String,
       trim: true,
       required: [true, 'Password is required'],
-      set: (password) => passwordEncrypt(password),
       select: false, // Don't return password by default
     },
 
@@ -158,6 +157,21 @@ UserSchema.methods.hasPermission = function (resource, action) {
   if (this.role === 'admin') return true; // Admin has all permissions
   return this.permissions[resource]?.[action] || false;
 };
+
+// Pre-save hook: Hash password before saving
+UserSchema.pre('save', async function (next) {
+  // Only hash password if it's modified
+  if (!this.isModified('password')) {
+    return next();
+  }
+
+  try {
+    this.password = await hashPassword(this.password);
+    next();
+  } catch (error) {
+    next(error);
+  }
+});
 
 // Statics
 UserSchema.statics.findByOrganization = function (organizationId) {

@@ -1,7 +1,4 @@
 "use strict";
-/* -------------------------------------------------------
-    TravelSync - Server with Auth Routes
-------------------------------------------------------- */
 
 const express = require('express');
 const dotenv = require('dotenv');
@@ -9,248 +6,128 @@ const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const compression = require('compression');
-
-// Load environment variables
-dotenv.config();
-
-// ============================================
-// CRITICAL: Error handlers MUST be at the top!
-// ============================================
-
-// Handle uncaught exceptions (MUST BE FIRST!)
-process.on('uncaughtException', (err) => {
-  console.error('❌ UNCAUGHT EXCEPTION! 💥 Shutting down...');
-  console.error('Error name:', err.name);
-  console.error('Error message:', err.message);
-  console.error('Stack:', err.stack);
-  process.exit(1);
-});
-
-// Handle unhandled rejections
-process.on('unhandledRejection', (err) => {
-  console.error('❌ UNHANDLED REJECTION! 💥 Shutting down...');
-  console.error('Error name:', err.name);
-  console.error('Error message:', err.message);
-  process.exit(1);
-});
-
-// Import configurations
 const { connectDatabase } = require('./config/database');
 
+dotenv.config();
+const logger = require('./config/logger');
+
 const app = express();
-const PORT = process.env.PORT || 5001;  // ✅ Changed from 5000 to 8000
+const PORT = process.env.PORT || 8000;
 
-// ============================================
-// MIDDLEWARE
-// ============================================
+// Database connection
+connectDatabase();
 
-// Security headers
+// Security & performance middleware
 app.use(helmet());
+app.use(compression());
 
-// CORS
-app.use(
-  cors({
-    origin: process.env.CORS_ORIGIN?.split(',') || 'http://localhost:5173',
-    credentials: true,
-  })
-);
+// CORS configuration
+const corsOptions = {
+  origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
+  credentials: true,
+};
+app.use(cors(corsOptions));
 
-// Body parser
+// Body parsing
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Compression
-app.use(compression());
+// Attach response methods to res object (res.success(), res.error(), etc.)
+const { attachResponseMethods } = require('./utils/response');
+app.use(attachResponseMethods);
 
-// Logging (only in development)
-if (process.env.NODE_ENV === 'development') {
+// Logging in development
+if (process.env.NODE_ENV !== 'production') {
   app.use(morgan('dev'));
 }
 
-// ============================================
-// ROUTES
-// ============================================
-
-// Health check
+// Health check endpoint
 app.get('/health', (req, res) => {
-  res.status(200).json({
-    success: true,
-    message: 'TravelSync API is running',
+  res.json({
+    status: 'ok',
     timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+  });
+});
+
+// Root endpoint
+app.get('/', (req, res) => {
+  res.json({
+    name: 'TravelSync API',
+    version: '1.0.0',
     environment: process.env.NODE_ENV || 'development',
   });
 });
 
-// Welcome route
-app.get('/', (req, res) => {
-  res.status(200).json({
-    success: true,
-    message: 'Welcome to TravelSync API',
-    version: '1.0.0',
-    endpoints: {
-      health: '/health',
-      auth: '/api/v1/auth',
-      organizations: '/api/v1/organizations',
-      users: '/api/v1/users',
-      properties: '/api/v1/properties',
-      roomTypes: '/api/v1/room-types',
-      ratePlans: '/api/v1/rate-plans',
-      prices: '/api/v1/prices',
-      inventory: '/api/v1/inventory',
-      reservations: '/api/v1/reservations',
-       agencies: '/api/v1/agencies', 
-  agencyContracts: '/api/v1/agency-contracts',
-    },
-  });
-});
+// API routes
+const apiRouter = express.Router();
 
-// API Routes
-app.use('/api/v1/auth', require('./routes/auth'));
-app.use('/api/v1/organizations', require('./routes/organization'));
-app.use('/api/v1/users', require('./routes/user'));
-app.use('/api/v1/properties', require('./routes/property'));
-app.use('/api/v1/room-types', require('./routes/roomType'));
-app.use('/api/v1/rate-plans', require('./routes/ratePlan'));
-app.use('/api/v1/prices', require('./routes/price'));
-app.use('/api/v1/inventory', require('./routes/inventory'));
-app.use('/api/v1/reservations', require('./routes/reservation'));
+apiRouter.use('/auth', require('./routes/auth'));
+apiRouter.use('/organizations', require('./routes/organization'));
+apiRouter.use('/users', require('./routes/user'));
+apiRouter.use('/properties', require('./routes/property'));
+apiRouter.use('/room-types', require('./routes/roomType'));
+apiRouter.use('/rate-plans', require('./routes/ratePlan'));
+apiRouter.use('/prices', require('./routes/price'));
+apiRouter.use('/inventory', require('./routes/inventory'));
+apiRouter.use('/reservations', require('./routes/reservation'));
+apiRouter.use('/agencies', require('./routes/agency'));
+apiRouter.use('/agency-contracts', require('./routes/agencyContract'));
 
-// Phase 2: Agency Routes
-app.use('/api/v1/agencies', require('./routes/agency'));
-app.use('/api/v1/agency-contracts', require('./routes/agencyContract')); 
+// AI Routes
+apiRouter.use('/ai/pricing', require('./routes/ai/pricing.routes'));
+apiRouter.use('/analytics', require('./routes/analytics'));
 
+// B2C Routes (Skeleton - Ready for future implementation)
+// TODO: Uncomment when implementing B2C module
+// apiRouter.use('/travelers', require('./routes/traveler'));
+// apiRouter.use('/trips', require('./routes/trip'));
+// apiRouter.use('/reviews', require('./routes/review'));
 
-// ============================================
-// ERROR HANDLING
-// ============================================
+app.use('/api/v1', apiRouter);
 
 // 404 handler
-app.use((req, res) => {
-  res.status(404).json({
-    success: false,
-    error: {
-      message: `Route ${req.originalUrl} not found`,
-      method: req.method,
-    },
-  });
+const { notFoundHandler, errorHandler } = require('./middlewares/errorHandler');
+app.use(notFoundHandler);
+
+// Global error handler (must be last)
+app.use(errorHandler);
+
+// Start server
+const server = app.listen(PORT, () => {
+  logger.info('TravelSync API Server');
+  logger.info(`Port: ${PORT}`);
+  logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
+  logger.info(`Time: ${new Date().toLocaleString()}`);
 });
 
-// Global error handler
-app.use((err, req, res, next) => {
-  let statusCode = 500;
-  let message = 'Internal server error';
-
-  // Mongoose validation error
-  if (err.name === 'ValidationError') {
-    statusCode = 400;
-    message = 'Validation error';
-  }
-
-  // Mongoose duplicate key error
-  if (err.name === 'MongoServerError' && err.code === 11000) {
-    statusCode = 409;
-    message = 'Duplicate field value entered';
-  }
-
-  // JWT errors
-  if (err.name === 'JsonWebTokenError') {
-    statusCode = 401;
-    message = 'Invalid token';
-  }
-
-  if (err.name === 'TokenExpiredError') {
-    statusCode = 401;
-    message = 'Token expired';
-  }
-
-  // Mongoose CastError (invalid ObjectId)
-  if (err.name === 'CastError') {
-    statusCode = 400;
-    message = 'Invalid ID format';
-  }
-
-  // Log error in development
-  if (process.env.NODE_ENV === 'development') {
-    console.error('❌ Error:', {
-      message: err.message,
-      stack: err.stack,
-      statusCode,
-    });
-  }
-
-  res.status(statusCode).json({
-    success: false,
-    error: {
-      message,
-      ...(process.env.NODE_ENV === 'development' && { 
-        stack: err.stack,
-        details: err.message 
-      }),
-    },
+// Graceful shutdown
+const shutdown = (signal) => {
+  logger.info(`${signal} received. Closing server...`);
+  server.close(() => {
+    logger.info('Server closed');
+    process.exit(0);
   });
-});
 
-// ============================================
-// SERVER START
-// ============================================
-
-const startServer = async () => {
-  try {
-    // Connect to database
-    await connectDatabase();
-    
-    // Start server
-    const server = app.listen(PORT, () => {
-      console.log(`
-╔═══════════════════════════════════════════╗
-║                                           ║
-║        🏨 TravelSync API Server          ║
-║                                           ║
-║  Environment: ${(process.env.NODE_ENV || 'development').padEnd(28)}║
-║  Port:        ${PORT.toString().padEnd(28)}║
-║  Database:    Connected ✓                 ║
-║                                           ║
-║  🔗 API Endpoints:                        ║
-║  ├─ Health:        /health                ║
-║  ├─ Auth:          /api/v1/auth           ║
-║  ├─ Organizations: /api/v1/organizations  ║
-║  ├─ Users:         /api/v1/users          ║
-║  ├─ Properties:    /api/v1/properties     ║
-║  ├─ Room Types:    /api/v1/room-types     ║
-║  ├─ Rate Plans:    /api/v1/rate-plans     ║
-║  ├─ Prices:        /api/v1/prices         ║
-║  ├─ Inventory:     /api/v1/inventory      ║
-║  └─ Reservations:  /api/v1/reservations   ║
-║                                           ║
-║  🚀 Server is ready to accept requests!  ║
-║                                           ║
-╚═══════════════════════════════════════════╝
-      `);
-    });
-
-    // Graceful shutdown
-    process.on('SIGTERM', () => {
-      console.log('👋 SIGTERM received. Shutting down gracefully...');
-      server.close(() => {
-        console.log('✅ Server closed');
-        process.exit(0);
-      });
-    });
-
-    process.on('SIGINT', () => {
-      console.log('\n👋 SIGINT received. Shutting down gracefully...');
-      server.close(() => {
-        console.log('✅ Server closed');
-        process.exit(0);
-      });
-    });
-
-  } catch (error) {
-    console.error('❌ Failed to start server:', error);
+  // Force shutdown after 10 seconds
+  setTimeout(() => {
+    logger.error('Forced shutdown');
     process.exit(1);
-  }
+  }, 10000);
 };
 
-// Start the server
-startServer();
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
+
+// Handle uncaught errors
+process.on('uncaughtException', (err) => {
+  logger.error('Uncaught Exception:', err);
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (err) => {
+  logger.error('Unhandled Rejection:', err);
+  process.exit(1);
+});
+
 module.exports = app;

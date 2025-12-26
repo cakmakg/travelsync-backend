@@ -191,7 +191,9 @@ RoomTypeSchema.virtual('inventory', {
 });
 
 // Methods
-RoomTypeSchema.methods.isAvailable = function (date) {
+RoomTypeSchema.methods.isAvailable = function (_date) {
+  // Parameter included for future per-date checks
+  void _date;
   // Check if room type is bookable and active
   return this.is_active && this.is_bookable;
 };

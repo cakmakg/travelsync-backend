@@ -24,7 +24,7 @@ const InventorySchema = new mongoose.Schema(
     date: {
       type: Date,
       required: [true, 'Date is required'],
-      index: true,
+      // Index defined below in schema.index()
     },
 
     // Total rooms available for this room type on this date
@@ -104,6 +104,7 @@ InventorySchema.index(
   { property_id: 1, room_type_id: 1, date: 1 },
   { unique: true }
 );
+// Indexes (date included in compound unique index above)
 InventorySchema.index({ date: 1 });
 InventorySchema.index({ available: 1 });
 
@@ -261,7 +262,8 @@ InventorySchema.statics.updateOnBooking = async function (
   roomTypeId,
   checkInDate,
   checkOutDate,
-  roomsBooked = 1
+  roomsBooked = 1,
+  session = null
 ) {
   const dates = [];
   const currentDate = new Date(checkInDate);
@@ -287,7 +289,8 @@ InventorySchema.statics.updateOnBooking = async function (
     },
   }));
 
-  return this.bulkWrite(bulkOps);
+  const options = session ? { session } : {};
+  return this.bulkWrite(bulkOps, options);
 };
 
 InventorySchema.statics.updateOnCancellation = async function (
@@ -295,7 +298,8 @@ InventorySchema.statics.updateOnCancellation = async function (
   roomTypeId,
   checkInDate,
   checkOutDate,
-  roomsBooked = 1
+  roomsBooked = 1,
+  session = null
 ) {
   const dates = [];
   const currentDate = new Date(checkInDate);
@@ -321,7 +325,8 @@ InventorySchema.statics.updateOnCancellation = async function (
     },
   }));
 
-  return this.bulkWrite(bulkOps);
+  const options = session ? { session } : {};
+  return this.bulkWrite(bulkOps, options);
 };
 
 /**

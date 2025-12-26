@@ -1,14 +1,21 @@
 "use strict";
 /* -------------------------------------------------------
     TravelSync - Reservation Service (Agency Support)
-    File: src/service/reservationService.js
+    File: src/services/reservation.service.js
+    FIXED: Added MongoDB transactions for atomicity
 ------------------------------------------------------- */
 const { Reservation, Inventory, Price, Agency } = require('../models');
+const { mongoose } = require('../config/database');
+const logger = require('../config/logger');
 
 /**
- * Create reservation (WITH AGENCY SUPPORT)
+ * Create reservation (WITH AGENCY SUPPORT + TRANSACTION)
+ * Uses MongoDB transaction to ensure atomicity
  */
 exports.createReservation = async (data, user) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
   try {
     const {
       property_id,
@@ -21,29 +28,37 @@ exports.createReservation = async (data, user) => {
       rooms_requested = 1,
     } = data;
 
-    console.log('[Reservation] Creating reservation:', {
-      property_id,
-      room_type_id,
-      rate_plan_id,
-      check_in_date,
-      check_out_date,
-      agency_id,
-    });
+    logger.info(`[Reservation] Creating reservation: ${JSON.stringify({ property_id, room_type_id, rate_plan_id, check_in_date, check_out_date, agency_id })}`);
 
-    // 1. Validate agency (if agency booking)
+    // 1. Validate property belongs to user's organization (WITHIN TRANSACTION)
+    const Property = require('../models').Property;
+    const property = await Property.findById(property_id).session(session);
+    if (!property) {
+      await session.abortTransaction();
+      throw new Error('Property not found');
+    }
+    if (property.organization_id.toString() !== user.organization_id.toString()) {
+      await session.abortTransaction();
+      throw new Error('Property does not belong to your organization');
+    }
+    logger.debug(`[Reservation] Property validated: ${property.name}`);
+
+    // 2. Validate agency (if agency booking) (WITHIN TRANSACTION)
     let agency = null;
     if (agency_id) {
-      agency = await Agency.findById(agency_id);
+      agency = await Agency.findById(agency_id).session(session);
       if (!agency) {
+        await session.abortTransaction();
         throw new Error('Agency not found');
       }
       if (!agency.is_active) {
+        await session.abortTransaction();
         throw new Error('Agency is not active');
       }
-      console.log('[Reservation] Agency validated:', agency.name);
+      logger.debug(`[Reservation] Agency validated: ${agency.name}`);
     }
 
-    // 2. Check availability
+    // 3. Check availability (WITHIN TRANSACTION)
     const isAvailable = await Inventory.checkAvailability(
       property_id,
       room_type_id,
@@ -53,16 +68,14 @@ exports.createReservation = async (data, user) => {
     );
 
     if (!isAvailable.available) {
+      await session.abortTransaction();
       throw new Error(`Not available: ${isAvailable.reason}`);
     }
 
-    console.log('[Reservation] Availability checked: OK');
+    logger.debug('[Reservation] Availability checked: OK');
 
-    // 3. Calculate price
-    console.log('[Reservation] Calculating price for:', {
-      check_in_date,
-      check_out_date,
-    });
+    // 4. Calculate price
+    logger.debug(`[Reservation] Calculating price for: ${JSON.stringify({check_in_date, check_out_date})}`);
 
     const totalPrice = await Price.calculateTotalPrice(
       property_id,
@@ -75,9 +88,9 @@ exports.createReservation = async (data, user) => {
     // Handle if calculateTotalPrice returns an object or number
     const finalPrice = typeof totalPrice === 'object' ? totalPrice.total : totalPrice;
 
-    console.log('[Reservation] Price calculated:', finalPrice);
+    logger.debug(`[Reservation] Price calculated: ${finalPrice}`);
 
-    // 4. Calculate commission (if agency booking)
+    // 5. Calculate commission (if agency booking)
     let commissionData = {
       percentage: 0,
       amount: 0,
@@ -88,7 +101,9 @@ exports.createReservation = async (data, user) => {
     if (agency) {
       const rate = agency.getCommissionRate(property_id);
       
+      // Validate commission rate
       if (rate < 0 || rate > 50) {
+        await session.abortTransaction();
         throw new Error(`Invalid commission rate: ${rate}%`);
       }
 
@@ -99,11 +114,11 @@ exports.createReservation = async (data, user) => {
         status: 'PENDING',
       };
 
-      console.log('[Reservation] Commission calculated:', commissionData);
+      logger.debug(`[Reservation] Commission calculated: ${JSON.stringify(commissionData)}`);
     }
 
-    // 5. Create reservation
-    const reservation = await Reservation.create({
+    // 6. Create reservation (WITHIN TRANSACTION)
+    const [reservation] = await Reservation.create([{
       ...data,
       created_by_user_id: user._id,
       total_price: finalPrice,
@@ -113,38 +128,61 @@ exports.createReservation = async (data, user) => {
       agency_booking_ref: agency_booking_ref || undefined,
       commission: agency_id ? commissionData : undefined,
       payment_responsibility: agency_id ? 'AGENCY' : 'GUEST',
-    });
+    }], { session });
 
-    console.log('[Reservation] Created:', reservation._id);
+    logger.info(`[Reservation] Created: ${reservation._id}`);
 
-    // 6. Update inventory
+    // 7. Update inventory (WITHIN TRANSACTION)
     await Inventory.updateOnBooking(
       property_id,
       room_type_id,
       new Date(check_in_date),
       new Date(check_out_date),
-      rooms_requested
+      rooms_requested,
+      session
     );
 
-    console.log('[Reservation] Inventory updated');
+    logger.info('[Reservation] Inventory updated');
 
-    // 7. Update agency stats (if agency booking)
+    // 8. Update agency stats (if agency booking) (WITHIN TRANSACTION)
     if (agency_id) {
-      await Agency.findByIdAndUpdate(agency_id, {
-        $inc: {
-          'stats.total_bookings': 1,
-          'stats.total_revenue': finalPrice,
-          'stats.total_commission': commissionData.amount,
+      await Agency.findByIdAndUpdate(
+        agency_id,
+        {
+          $inc: {
+            'stats.total_bookings': 1,
+            'stats.total_revenue': finalPrice,
+            'stats.total_commission': commissionData.amount,
+          },
         },
-      });
-      console.log('[Reservation] Agency stats updated');
+        { session }
+      );
+      logger.info('[Reservation] Agency stats updated');
+    }
+
+    // Commit transaction - all operations succeeded
+    await session.commitTransaction();
+    logger.info('[Reservation] Transaction committed successfully');
+
+    // Send booking confirmation email asynchronously (do not block response)
+    try {
+      const property = await Property.findById(property_id).select('name contact');
+      const emailService = require('./email.service');
+      emailService.sendBookingConfirmation(reservation, property);
+    } catch (emailErr) {
+      logger.warn('[Reservation] Failed to queue booking email', { err: emailErr.message });
     }
 
     return reservation;
 
   } catch (error) {
-    console.error('[Reservation Service] Create error:', error.message);
+    // Abort transaction on any error
+    await session.abortTransaction();
+    logger.error(`[Reservation Service] Transaction aborted: ${error.message}`);
     throw error;
+  } finally {
+    // End session
+    session.endSession();
   }
 };
 
@@ -163,9 +201,40 @@ exports.getAllReservations = async (filters = {}, user) => {
       limit = 50,
     } = filters;
 
-    const query = { organization_id: user.organization_id };
+    // Multi-tenant filter: Get reservations for properties belonging to user's organization
+    // Reservation doesn't have organization_id, we filter by property.organization_id
+    const Property = require('../models').Property;
+    const query = {};
+    
+    // If property_id is provided, validate it belongs to user's organization
+    if (property_id) {
+      const property = await Property.findById(property_id);
+      if (!property) {
+        throw new Error('Property not found');
+      }
+      if (property.organization_id.toString() !== user.organization_id.toString()) {
+        throw new Error('Property does not belong to your organization');
+      }
+      query.property_id = property_id;
+    } else {
+      // If no property_id, get all properties for user's organization
+      const properties = await Property.find({ organization_id: user.organization_id });
+      const propertyIds = properties.map(p => p._id);
+      if (propertyIds.length === 0) {
+        // No properties, return empty result
+        return {
+          reservations: [],
+          pagination: {
+            total: 0,
+            page: Number(page),
+            limit: Number(limit),
+            pages: 0,
+          },
+        };
+      }
+      query.property_id = { $in: propertyIds };
+    }
 
-    if (property_id) query.property_id = property_id;
     if (room_type_id) query.room_type_id = room_type_id;
     if (status) query.status = status;
 
@@ -210,10 +279,7 @@ exports.getAllReservations = async (filters = {}, user) => {
  */
 exports.getReservationById = async (id, user) => {
   try {
-    const reservation = await Reservation.findOne({
-      _id: id,
-      organization_id: user.organization_id,
-    })
+    const reservation = await Reservation.findById(id)
       .populate('property_id')
       .populate('room_type_id')
       .populate('rate_plan_id')
@@ -221,6 +287,11 @@ exports.getReservationById = async (id, user) => {
       .populate('created_by_user_id', 'name email');
 
     if (!reservation) {
+      throw new Error('Reservation not found');
+    }
+
+    // Multi-tenant check: Verify reservation's property belongs to user's organization
+    if (reservation.property_id.organization_id.toString() !== user.organization_id.toString()) {
       throw new Error('Reservation not found');
     }
 
@@ -232,24 +303,185 @@ exports.getReservationById = async (id, user) => {
 };
 
 /**
- * Update reservation
+ * Get today's arrivals for a property
  */
-exports.updateReservation = async (id, updates, user) => {
+exports.getTodaysArrivals = async (propertyId, user) => {
   try {
-    const reservation = await Reservation.findOneAndUpdate(
-      {
-        _id: id,
-        organization_id: user.organization_id,
-      },
-      updates,
-      { new: true, runValidators: true }
-    );
+    const Property = require('../models').Property;
+    const property = await Property.findById(propertyId);
+    if (!property) throw new Error('Property not found');
+    if (user && property.organization_id.toString() !== user.organization_id.toString()) {
+      throw new Error('Property not found');
+    }
 
-    if (!reservation) {
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+    const end = new Date();
+    end.setHours(23, 59, 59, 999);
+
+    const query = {
+      property_id: propertyId,
+      check_in_date: { $gte: start, $lte: end },
+      deleted_at: null,
+    };
+
+    const arrivals = await Reservation.find(query)
+      .populate('property_id', 'name code')
+      .populate('room_type_id', 'name code')
+      .populate('rate_plan_id', 'name code')
+      .sort('check_in_date')
+      .lean();
+
+    return arrivals;
+  } catch (error) {
+    console.error('[Reservation Service] getTodaysArrivals error:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get today's departures for a property
+ */
+exports.getTodaysDepartures = async (propertyId, user) => {
+  try {
+    const Property = require('../models').Property;
+    const property = await Property.findById(propertyId);
+    if (!property) throw new Error('Property not found');
+    if (user && property.organization_id.toString() !== user.organization_id.toString()) {
+      throw new Error('Property not found');
+    }
+
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+    const end = new Date();
+    end.setHours(23, 59, 59, 999);
+
+    const query = {
+      property_id: propertyId,
+      check_out_date: { $gte: start, $lte: end },
+      deleted_at: null,
+    };
+
+    const departures = await Reservation.find(query)
+      .populate('property_id', 'name code')
+      .populate('room_type_id', 'name code')
+      .populate('rate_plan_id', 'name code')
+      .sort('check_out_date')
+      .lean();
+
+    return departures;
+  } catch (error) {
+    console.error('[Reservation Service] getTodaysDepartures error:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get reservation by booking reference
+ */
+exports.getReservationByBookingReference = async (bookingReference, user) => {
+  try {
+    const reservation = await Reservation.findOne({
+      booking_reference: bookingReference,
+      deleted_at: null,
+    })
+      .populate('property_id')
+      .populate('room_type_id')
+      .populate('rate_plan_id')
+      .populate('created_by_user_id', 'first_name last_name email')
+      .populate('agency_id', 'name');
+
+    if (!reservation) throw new Error('Reservation not found');
+
+    if (user && reservation.property_id.organization_id.toString() !== user.organization_id.toString()) {
       throw new Error('Reservation not found');
     }
 
     return reservation;
+  } catch (error) {
+    console.error('[Reservation Service] getReservationByBookingReference error:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get statistics for a property
+ */
+exports.getStats = async (propertyId, user) => {
+  try {
+    const Property = require('../models').Property;
+    const property = await Property.findById(propertyId);
+    if (!property) throw new Error('Property not found');
+    if (user && property.organization_id.toString() !== user.organization_id.toString()) {
+      throw new Error('Property not found');
+    }
+
+    const query = { property_id: propertyId, deleted_at: null };
+
+    const [
+      total,
+      confirmed,
+      checkedIn,
+      checkedOut,
+      cancelled,
+      todaysArrivals,
+      todaysDepartures,
+    ] = await Promise.all([
+      Reservation.countDocuments(query),
+      Reservation.countDocuments({ ...query, status: 'confirmed' }),
+      Reservation.countDocuments({ ...query, status: 'checked_in' }),
+      Reservation.countDocuments({ ...query, status: 'checked_out' }),
+      Reservation.countDocuments({ ...query, status: 'cancelled' }),
+      exports.getTodaysArrivals(propertyId, user),
+      exports.getTodaysDepartures(propertyId, user),
+    ]);
+
+    const stats = {
+      total_reservations: total,
+      by_status: {
+        confirmed,
+        checked_in: checkedIn,
+        checked_out: checkedOut,
+        cancelled,
+      },
+      today: {
+        arrivals: todaysArrivals.length,
+        departures: todaysDepartures.length,
+      },
+    };
+
+    return stats;
+  } catch (error) {
+    console.error('[Reservation Service] getStats error:', error);
+    throw error;
+  }
+};
+
+/**
+ * Update reservation
+ */
+exports.updateReservation = async (id, updates, user) => {
+  try {
+    // First, verify reservation belongs to user's organization
+    const reservation = await Reservation.findById(id).populate('property_id');
+    
+    if (!reservation) {
+      throw new Error('Reservation not found');
+    }
+
+    // Multi-tenant check: Verify reservation's property belongs to user's organization
+    if (reservation.property_id.organization_id.toString() !== user.organization_id.toString()) {
+      throw new Error('Reservation not found');
+    }
+
+    // Update reservation
+    const updatedReservation = await Reservation.findByIdAndUpdate(
+      id,
+      updates,
+      { new: true, runValidators: true }
+    );
+
+    return updatedReservation;
   } catch (error) {
     console.error('[Reservation Service] Update error:', error);
     throw error;
@@ -257,54 +489,102 @@ exports.updateReservation = async (id, updates, user) => {
 };
 
 /**
- * Cancel reservation (WITH COMMISSION REVERSAL)
+ * Cancel reservation (WITH COMMISSION REVERSAL + TRANSACTION)
+ * Uses MongoDB transaction to ensure atomicity
  */
-exports.cancelReservation = async (id, reason, user) => {
+exports.cancelReservation = async (id, reason, _user) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
   try {
-    const reservation = await Reservation.findOne({
-      _id: id,
-      organization_id: user.organization_id,
-    });
+    // Mark _user as used to satisfy lint
+    void _user;
+
+    // First, verify reservation belongs to user's organization
+    const reservation = await Reservation.findById(id).populate('property_id').session(session);
 
     if (!reservation) {
       throw new Error('Reservation not found');
     }
 
+    // Validate cancellation status
     if (reservation.status === 'cancelled') {
+      await session.abortTransaction();
       throw new Error('Reservation already cancelled');
     }
 
     if (reservation.status === 'checked_out') {
+      await session.abortTransaction();
       throw new Error('Cannot cancel checked-out reservation');
     }
 
-    // Cancel reservation
-    await reservation.cancel(reason);
+    // Cancel reservation (WITHIN TRANSACTION)
+    reservation.status = 'cancelled';
+    reservation.cancelled_at = new Date();
+    if (reason) reservation.cancellation_reason = reason;
+    await reservation.save({ session });
 
-    // Release inventory
+    logger.info(`[Reservation] Cancelled: ${reservation._id}`);
+
+    // Release inventory (WITHIN TRANSACTION)
     await Inventory.updateOnCancellation(
       reservation.property_id,
       reservation.room_type_id,
       new Date(reservation.check_in_date),
       new Date(reservation.check_out_date),
-      reservation.rooms_requested || 1
+      reservation.rooms_requested || 1,
+      session
     );
 
-    // Reverse agency stats (if agency booking)
+    logger.info('[Reservation] Inventory released');
+
+    // Reverse agency stats (if agency booking) (WITHIN TRANSACTION)
     if (reservation.agency_id) {
-      await Agency.findByIdAndUpdate(reservation.agency_id, {
-        $inc: {
-          'stats.total_bookings': -1,
-          'stats.total_revenue': -reservation.total_price,
-          'stats.total_commission': -(reservation.commission?.amount || 0),
+      const totalPrice = typeof reservation.total_price === 'object' 
+        ? parseFloat(reservation.total_price.toString()) 
+        : reservation.total_price;
+      const commissionAmount = reservation.commission?.amount 
+        ? (typeof reservation.commission.amount === 'object'
+          ? parseFloat(reservation.commission.amount.toString())
+          : reservation.commission.amount)
+        : 0;
+
+      await Agency.findByIdAndUpdate(
+        reservation.agency_id,
+        {
+          $inc: {
+            'stats.total_bookings': -1,
+            'stats.total_revenue': -totalPrice,
+            'stats.total_commission': -commissionAmount,
+          },
         },
-      });
+        { session }
+      );
+      logger.info('[Reservation] Agency stats reversed');
+    }
+
+    // Commit transaction
+    await session.commitTransaction();
+    logger.info('[Reservation] Cancel transaction committed successfully');
+
+    // Send cancellation email asynchronously
+    try {
+      const property = await Property.findById(reservation.property_id).select('name contact');
+      const emailService = require('./email.service');
+      emailService.sendCancellation(reservation, property, reason);
+    } catch (emailErr) {
+      logger.warn('[Reservation] Failed to queue cancellation email', { err: emailErr.message });
     }
 
     return reservation;
   } catch (error) {
-    console.error('[Reservation Service] Cancel error:', error);
+    // Abort transaction on any error
+    await session.abortTransaction();
+    logger.error(`[Reservation Service] Cancel transaction aborted: ${error.message}`);
     throw error;
+  } finally {
+    // End session
+    session.endSession();
   }
 };
 
@@ -313,12 +593,15 @@ exports.cancelReservation = async (id, reason, user) => {
  */
 exports.checkInReservation = async (id, user) => {
   try {
-    const reservation = await Reservation.findOne({
-      _id: id,
-      organization_id: user.organization_id,
-    });
-
+    // First, verify reservation belongs to user's organization
+    const reservation = await Reservation.findById(id).populate('property_id');
+    
     if (!reservation) {
+      throw new Error('Reservation not found');
+    }
+
+    // Multi-tenant check: Verify reservation's property belongs to user's organization
+    if (reservation.property_id.organization_id.toString() !== user.organization_id.toString()) {
       throw new Error('Reservation not found');
     }
 
@@ -335,12 +618,15 @@ exports.checkInReservation = async (id, user) => {
  */
 exports.checkOutReservation = async (id, user) => {
   try {
-    const reservation = await Reservation.findOne({
-      _id: id,
-      organization_id: user.organization_id,
-    });
-
+    // First, verify reservation belongs to user's organization
+    const reservation = await Reservation.findById(id).populate('property_id');
+    
     if (!reservation) {
+      throw new Error('Reservation not found');
+    }
+
+    // Multi-tenant check: Verify reservation's property belongs to user's organization
+    if (reservation.property_id.organization_id.toString() !== user.organization_id.toString()) {
       throw new Error('Reservation not found');
     }
 

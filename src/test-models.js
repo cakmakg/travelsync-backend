@@ -4,27 +4,28 @@
 ------------------------------------------------------- */
 
 require('dotenv').config();
+const logger = require('./config/logger');
 const { connectDatabase } = require('./config/database');
 const { Organization, User, Property, RoomType, RatePlan } = require('./models');
 
 const testModels = async () => {
   try {
-    console.log('🚀 Starting model tests...\n');
+    logger.info('🚀 Starting model tests...');
 
     // Connect to DB
     await connectDatabase();
 
     // Clean up test data
-    console.log('🧹 Cleaning up old test data...');
+    logger.info('🧹 Cleaning up old test data...');
     await Organization.deleteMany({ name: /^Test/ });
     await User.deleteMany({ email: /^test/ });
     await Property.deleteMany({ name: /^Test/ });
     await RoomType.deleteMany({ name: /^Test/ });
     await RatePlan.deleteMany({ name: /^Test/ });
-    console.log('✅ Cleanup complete\n');
+    logger.info('✅ Cleanup complete');
 
     // 1. Create Organization
-    console.log('📦 Creating Organization...');
+    logger.info('📦 Creating Organization...');
     const org = await Organization.create({
       type: 'HOTEL',
       name: 'Test Hotel Group',
@@ -32,12 +33,12 @@ const testModels = async () => {
       timezone: 'Europe/Berlin',
       currency: 'EUR',
     });
-    console.log(`✅ Organization created: ${org._id}`);
-    console.log(`   Name: ${org.name}`);
-    console.log(`   Type: ${org.type}\n`);
+    logger.info(`✅ Organization created: ${org._id}`);
+    logger.info(`   Name: ${org.name}`);
+    logger.info(`   Type: ${org.type}`);
 
     // 2. Create User
-    console.log('👤 Creating User...');
+    logger.info('👤 Creating User...');
     const user = await User.create({
       organization_id: org._id,
       email: 'test@example.com',
@@ -46,13 +47,13 @@ const testModels = async () => {
       last_name: 'User',
       role: 'admin',
     });
-    console.log(`✅ User created: ${user._id}`);
-    console.log(`   Email: ${user.email}`);
-    console.log(`   Name: ${user.first_name} ${user.last_name}`);
-    console.log(`   Role: ${user.role}\n`);
+    logger.info(`✅ User created: ${user._id}`);
+    logger.info(`   Email: ${user.email}`);
+    logger.info(`   Name: ${user.first_name} ${user.last_name}`);
+    logger.info(`   Role: ${user.role}`);
 
     // 3. Create Property
-    console.log('🏨 Creating Property...');
+    logger.info('🏨 Creating Property...');
     const property = await Property.create({
       organization_id: org._id,
       name: 'Test Hotel Munich',
@@ -71,13 +72,13 @@ const testModels = async () => {
         phone: '+49 89 12345678',
       },
     });
-    console.log(`✅ Property created: ${property._id}`);
-    console.log(`   Name: ${property.name}`);
-    console.log(`   Code: ${property.code}`);
-    console.log(`   Address: ${property.address.city}, ${property.address.country}\n`);
+    logger.info(`✅ Property created: ${property._id}`);
+    logger.info(`   Name: ${property.name}`);
+    logger.info(`   Code: ${property.code}`);
+    logger.info(`   Address: ${property.address.city}, ${property.address.country}`);
 
     // 4. Create Room Type
-    console.log('🛏️  Creating Room Type...');
+    logger.info('🛏️  Creating Room Type...');
     const roomType = await RoomType.create({
       property_id: property._id,
       code: 'STD',
@@ -91,13 +92,13 @@ const testModels = async () => {
       total_quantity: 10,
       amenities: ['balcony', 'wifi', 'tv'],
     });
-    console.log(`✅ Room Type created: ${roomType._id}`);
-    console.log(`   Code: ${roomType.code}`);
-    console.log(`   Name: ${roomType.name}`);
-    console.log(`   Capacity: ${roomType.capacity.adults} adults + ${roomType.capacity.children} children\n`);
+    logger.info(`✅ Room Type created: ${roomType._id}`);
+    logger.info(`   Code: ${roomType.code}`);
+    logger.info(`   Name: ${roomType.name}`);
+    logger.info(`   Capacity: ${roomType.capacity.adults} adults + ${roomType.capacity.children} children`);
 
     // 5. Create Rate Plan
-    console.log('💰 Creating Rate Plan...');
+    logger.info('💰 Creating Rate Plan...');
     const ratePlan = await RatePlan.create({
       property_id: property._id,
       code: 'BAR',
@@ -112,48 +113,48 @@ const testModels = async () => {
       },
       min_nights: 1,
     });
-    console.log(`✅ Rate Plan created: ${ratePlan._id}`);
-    console.log(`   Code: ${ratePlan.code}`);
-    console.log(`   Name: ${ratePlan.name}`);
-    console.log(`   Meal Plan: ${ratePlan.meal_plan}\n`);
+    logger.info(`✅ Rate Plan created: ${ratePlan._id}`);
+    logger.info(`   Code: ${ratePlan.code}`);
+    logger.info(`   Name: ${ratePlan.name}`);
+    logger.info(`   Meal Plan: ${ratePlan.meal_plan}`);
 
     // Test relationships with populate
-    console.log('🔗 Testing Relationships...');
+    logger.info('🔗 Testing Relationships...');
     const userWithOrg = await User.findById(user._id).populate('organization_id');
-    console.log(`✅ User → Organization: ${userWithOrg.organization_id.name}`);
+    logger.info(`✅ User → Organization: ${userWithOrg.organization_id.name}`);
 
     const propertyWithRoomTypes = await Property.findById(property._id).populate('room_types');
-    console.log(`✅ Property → Room Types: ${propertyWithRoomTypes.room_types.length} room type(s)`);
+    logger.info(`✅ Property → Room Types: ${propertyWithRoomTypes.room_types.length} room type(s)`);
 
     const propertyWithRatePlans = await Property.findById(property._id).populate('rate_plans');
-    console.log(`✅ Property → Rate Plans: ${propertyWithRatePlans.rate_plans.length} rate plan(s)\n`);
+    logger.info(`✅ Property → Rate Plans: ${propertyWithRatePlans.rate_plans.length} rate plan(s)`);
 
     // Summary
-    console.log('╔═══════════════════════════════════════════╗');
-    console.log('║                                           ║');
-    console.log('║   🎉 ALL MODELS WORKING PERFECTLY! 🎉   ║');
-    console.log('║                                           ║');
-    console.log('╚═══════════════════════════════════════════╝\n');
+    logger.info('╔═══════════════════════════════════════════╗');
+    logger.info('║                                           ║');
+    logger.info('║   🎉 ALL MODELS WORKING PERFECTLY! 🎉   ║');
+    logger.info('║                                           ║');
+    logger.info('╚═══════════════════════════════════════════╝');
 
-    console.log('📊 Summary:');
-    console.log(`   Organizations: ${await Organization.countDocuments()}`);
-    console.log(`   Users: ${await User.countDocuments()}`);
-    console.log(`   Properties: ${await Property.countDocuments()}`);
-    console.log(`   Room Types: ${await RoomType.countDocuments()}`);
-    console.log(`   Rate Plans: ${await RatePlan.countDocuments()}\n`);
+    logger.info('📊 Summary:');
+    logger.info(`   Organizations: ${await Organization.countDocuments()}`);
+    logger.info(`   Users: ${await User.countDocuments()}`);
+    logger.info(`   Properties: ${await Property.countDocuments()}`);
+    logger.info(`   Room Types: ${await RoomType.countDocuments()}`);
+    logger.info(`   Rate Plans: ${await RatePlan.countDocuments()}`);
 
-    console.log('💡 Next Steps:');
-    console.log('   1. Check MongoDB Atlas to see the data');
-    console.log('   2. Create auth routes & controllers');
-    console.log('   3. Test API with Postman\n');
+    logger.info('💡 Next Steps:');
+    logger.info('   1. Check MongoDB Atlas to see the data');
+    logger.info('   2. Create auth routes & controllers');
+    logger.info('   3. Test API with Postman');
 
     process.exit(0);
   } catch (error) {
-    console.error('❌ Test Error:', error.message);
+    logger.error(`❌ Test Error: ${error.message}`);
     if (error.errors) {
-      console.error('\n📋 Validation Errors:');
+      logger.error('\n📋 Validation Errors:');
       Object.keys(error.errors).forEach(key => {
-        console.error(`   - ${key}: ${error.errors[key].message}`);
+        logger.error(`   - ${key}: ${error.errors[key].message}`);
       });
     }
     process.exit(1);

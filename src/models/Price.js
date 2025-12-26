@@ -4,6 +4,7 @@
 ------------------------------------------------------- */
 
 const { mongoose } = require('../config/database');
+const logger = require('../config/logger');
 
 const PriceSchema = new mongoose.Schema(
   {
@@ -31,7 +32,7 @@ const PriceSchema = new mongoose.Schema(
     date: {
       type: Date,
       required: [true, 'Date is required'],
-      index: true,
+      // Index defined below in schema.index()
     },
 
     amount: {
@@ -91,7 +92,7 @@ PriceSchema.index(
   { unique: true }
 );
 
-// Query optimization indexes
+// Query optimization indexes (date included in compound indexes)
 PriceSchema.index({ property_id: 1, date: 1 });
 PriceSchema.index({ room_type_id: 1, date: 1 });
 PriceSchema.index({ rate_plan_id: 1, date: 1 });
@@ -134,7 +135,7 @@ PriceSchema.statics.calculateTotalPrice = async function (
     throw new Error('Invalid date range: check-in must be before check-out');
   }
 
-  console.log('[Price] Searching for dates:', dates.map(d => d.toISOString().split('T')[0]));
+  logger.debug(`[Price] Searching for dates: ${dates.map(d => d.toISOString().split('T')[0]).join(',')}`);
 
   // Find prices for all dates
   const prices = await this.find({
@@ -145,7 +146,7 @@ PriceSchema.statics.calculateTotalPrice = async function (
     is_available: true,
   }).lean();
 
-  console.log('[Price] Found:', prices.length, '/', dates.length);
+  logger.debug(`[Price] Found: ${prices.length} / ${dates.length}`);
 
   // Check if all dates have prices
   if (prices.length !== dates.length) {
@@ -154,7 +155,7 @@ PriceSchema.statics.calculateTotalPrice = async function (
       .filter(d => !foundDates.includes(d.toISOString().split('T')[0]))
       .map(d => d.toISOString().split('T')[0]);
     
-    console.log('[Price] Missing dates:', missingDates);
+    logger.warn(`[Price] Missing dates: ${missingDates.join(',')}`);
     throw new Error(`Price not found for dates: ${missingDates.join(', ')}`);
   }
 
@@ -162,7 +163,7 @@ PriceSchema.statics.calculateTotalPrice = async function (
   const subtotal = prices.reduce((sum, price) => sum + (price.amount || 0), 0);
   const total = subtotal * rooms;
 
-  console.log('[Price] Total calculated:', total);
+  logger.debug(`[Price] Total calculated: ${total}`);
 
   return {
     total,

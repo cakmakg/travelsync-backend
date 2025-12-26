@@ -7,12 +7,9 @@ const { mongoose } = require('../config/database');
 
 const AgencyContractSchema = new mongoose.Schema(
   {
-    organization_id: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Organization',
-      required: [true, 'Organization ID is required'],
-      index: true,
-    },
+    // Note: organization_id is not stored here.
+    // Hotel's organization: property.organization_id
+    // Agency's organization: agency.organization_id
 
     property_id: {
       type: mongoose.Schema.Types.ObjectId,

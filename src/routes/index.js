@@ -1,19 +1,11 @@
 "use strict";
 /* -------------------------------------------------------
     TravelSync - Routes Index
+    Central export point for all routes
 ------------------------------------------------------- */
 
-/**
- * Export all route modules
- * 
- * Usage:
- * const routes = require('./routes');
- * app.use('/api/v1/auth', routes.auth);
- * app.use('/api/v1/organizations', routes.organization);
- * ...
- */
-
 module.exports = {
+  // B2B Routes
   auth: require('./auth'),
   organization: require('./organization'),
   user: require('./user'),
@@ -23,6 +15,11 @@ module.exports = {
   price: require('./price'),
   inventory: require('./inventory'),
   reservation: require('./reservation'),
-  agency: require('./agency'),              // ✅ Küçük harf!
-  agencyContract: require('./agencyContract')  // ✅ Küçük harf!
+  agency: require('./agency'),
+  agencyContract: require('./agencyContract'),
+  
+  // B2C Routes (Skeleton - Ready for future implementation)
+  traveler: require('./traveler'),
+  trip: require('./trip'),
+  review: require('./review'),
 };

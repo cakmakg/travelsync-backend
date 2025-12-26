@@ -141,10 +141,6 @@ const OrganizationSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
-    deleted_at: {
-      type: Date,
-      default: null,
-    },
 
     // Metadata
     notes: {
