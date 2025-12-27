@@ -1,189 +1,269 @@
 # 🏨 TravelSync - Hotel Automation Platform
 
-> AI-powered tourism automation platform connecting hotels, agencies, and travelers through intelligent reservation management, dynamic pricing, and automated workflows.
+> AI-powered hotel management platform with intelligent reservation management, dynamic pricing, and automated workflows for B2B operations.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue)](https://www.typescriptlang.org/)
-[![React](https://img.shields.io/badge/React-18-61dafb)](https://reactjs.org/)
 [![Node.js](https://img.shields.io/badge/Node.js-20-green)](https://nodejs.org/)
 [![MongoDB](https://img.shields.io/badge/MongoDB-7.0-green)](https://www.mongodb.com/)
+[![Express](https://img.shields.io/badge/Express-4.18-lightgrey)](https://expressjs.com/)
 
 ---
 
 ## 📋 Table of Contents
 
 - [Overview](#overview)
+- [Current Status](#current-status)
 - [Features](#features)
 - [Tech Stack](#tech-stack)
 - [Getting Started](#getting-started)
 - [Project Structure](#project-structure)
 - [API Documentation](#api-documentation)
-- [Deployment](#deployment)
-- [Contributing](#contributing)
-- [License](#license)
+- [Security](#security)
+- [Roadmap](#roadmap)
+- [Documentation](#documentation)
 
 ---
 
 ## 🎯 Overview
 
-TravelSync is a **B2B SaaS platform** designed to automate manual workflows in the tourism industry. Starting with hotels, the platform eliminates repetitive tasks like reservation management, pricing updates, and reporting through AI-powered automation.
+TravelSync is a **B2B SaaS platform** designed to automate manual workflows in the tourism industry. The platform focuses on hotels and travel agencies, eliminating repetitive tasks through intelligent automation.
 
 ### The Problem
 
 Hotels and travel agencies waste countless hours on:
 - ❌ Manual reservation tracking across multiple channels
 - ❌ Inefficient pricing decisions (missing revenue opportunities)
-- ❌ Time-consuming offer creation for agencies
-- ❌ Disconnected systems (PMS, OTA, email, spreadsheets)
+- ❌ Time-consuming agency contract management
+- ❌ Disconnected systems (PMS, spreadsheets, email)
 
 ### The Solution
 
 TravelSync provides:
-- ✅ **Centralized Dashboard** - Manage all reservations in one place
-- ✅ **Dynamic Pricing** - AI-powered price suggestions based on occupancy, season, and demand
+- ✅ **Centralized Dashboard** - Manage all reservations and properties in one place
+- ✅ **Dynamic Pricing AI** - AI-powered price suggestions based on occupancy, season, and demand
+- ✅ **Agency Management** - B2B contracts, commissions, and booking automation
 - ✅ **Analytics** - Real-time insights on occupancy, revenue, and trends
 - ✅ **Automation** - Reduce manual work by 50%+ with smart workflows
 
 ---
 
+## 📊 Current Status
+
+**Version:** 1.0.0 (Backend MVP)
+**Progress:** 80% Complete
+**Last Updated:** December 26, 2025
+
+### ✅ Completed Features
+
+#### Core Infrastructure (100%)
+- ✅ Express.js server with CommonJS
+- ✅ MongoDB connection with Mongoose
+- ✅ Multi-tenant architecture (Organization-based)
+- ✅ JWT authentication & authorization
+- ✅ Error handling & logging
+- ✅ CORS, Helmet, compression middleware
+
+#### Database & Models (100%)
+11 production-ready models:
+- ✅ Organization (Multi-tenant)
+- ✅ User (Staff accounts with roles)
+- ✅ Property (Hotels)
+- ✅ RoomType (Room templates)
+- ✅ RatePlan (Pricing strategies)
+- ✅ Price (Daily rates with timezone support)
+- ✅ Inventory (Availability tracking)
+- ✅ Reservation (Bookings with transactions)
+- ✅ Agency (Travel agencies)
+- ✅ AgencyContract (Hotel-Agency contracts)
+- ✅ AuditLog (Activity tracking)
+
+#### API Endpoints (100%)
+- ✅ Authentication (register, login, refresh, logout)
+- ✅ Property management (CRUD)
+- ✅ Room type management (CRUD)
+- ✅ Rate plan management (CRUD)
+- ✅ Price management (bulk updates)
+- ✅ Inventory management (allotment, stop-sell)
+- ✅ Reservation management (create, cancel, check-in/out)
+- ✅ Agency management (CRUD, contracts)
+- ✅ Agency contract management (commission tracking)
+
+#### AI Features (50%)
+- ✅ Dynamic Pricing AI (baseline model)
+- ✅ Occupancy-based pricing
+- ✅ Seasonality detection
+- ✅ Day-of-week pricing
+- ✅ Historical demand analysis
+- ⏳ ML model (planned)
+
+#### Code Quality (80%)
+- ✅ TypeScript cleanup completed
+- ✅ Duplicate index fixes
+- ✅ Agency-Hotel relationship fixes
+- ⏳ Code refactoring (planned)
+- ⏳ Helper functions (planned)
+
+### ⏳ In Progress / Planned
+
+#### High Priority
+- [ ] **Code Refactoring** - Response helpers, error handler middleware, async handler
+- [ ] **MongoDB Replica Set** - For transaction support
+- [ ] **Security Hardening** - Rate limiting, input sanitization, CORS whitelist
+- [ ] **Postman Collection** - API testing suite
+
+#### Medium Priority
+- [ ] Analytics & Reporting endpoints
+- [ ] Email notifications (Resend/Nodemailer)
+- [ ] API documentation (Swagger/OpenAPI)
+- [ ] Unit & integration tests
+
+#### Low Priority
+- [ ] Frontend (React + TypeScript + Tailwind)
+- [ ] Advanced AI pricing (ML model)
+- [ ] Real-time notifications
+
+### ❌ Not Included in MVP
+- **B2C (Traveler) Module** - Postponed to Phase 4
+  - Skeleton models created but routes are disabled
+  - Focus is on B2B (Hotels + Agencies)
+
+---
+
 ## ✨ Features
 
-### MVP (Current Focus - Hotel Module with Professional Schema)
+### MVP Features (Current Focus)
 
-#### 🏢 Multi-tenant Organizations
+#### 🏢 Multi-tenant Architecture
 - Organization-based separation (HOTEL/AGENCY types)
-- Single database with logical separation
-- Subscription management per organization
+- Logical data isolation with single database
 - Multi-property support for hotel chains
+- Role-based access control (admin, staff)
 
 #### 🏨 Property Management
-- Hotel profile management (name, location, amenities, images)
-- Multi-property support within one organization
+- Hotel profile management (name, location, amenities)
+- Multi-property support within organization
 - Star rating, property type classification
 - Check-in/out times, cancellation policies
 
 #### 🛏️ Room Type Management
-- Room templates (Standard, Deluxe, Suite, etc.)
+- Room templates (Standard, Deluxe, Suite)
 - Capacity, bed configuration, amenities
 - Total quantity tracking per type
 - Professional categorization (code + name)
 
 #### 💰 Rate Plan Management
-- Multiple pricing strategies per property
+- Multiple pricing strategies (BAR, NRF)
 - Meal plan options (RO, BB, HB, FB, AI)
-- Cancellation policies (flexible, moderate, strict, non-refundable)
-- Derived rate plans (e.g., Non-refundable at -10% from BAR)
+- Cancellation policies (flexible, strict, non-refundable)
+- Derived rate plans with percentage adjustments
 - Min/max night restrictions
 
-#### 💵 Dynamic Pricing
+#### 💵 Dynamic Pricing AI
 - Daily price management per room type + rate plan
 - Bulk price updates for date ranges
-- AI-powered price suggestions based on:
-  - Occupancy levels
-  - Seasonality
-  - Day of week
-  - Local events
+- **AI-powered price suggestions** based on:
+  - Occupancy levels (high/medium/low)
+  - Seasonality (summer, winter, holidays)
+  - Day of week (weekend premium)
+  - Historical demand patterns
+- Confidence scoring for suggestions
 - Price source tracking (MANUAL vs AI)
+- Revenue impact calculations
 
 #### 📦 Inventory Management
 - Real-time availability tracking
 - Allotment management per room type
 - Stop-sell controls
 - Automatic inventory updates on booking/cancellation
-- Overbooking prevention
+- **Overbooking prevention** with transaction support
 
 #### 📅 Reservation Management
 - Create, view, update, cancel reservations
 - Guest information management
 - Check-in/check-out workflows
-- Booking reference generation (idempotent)
+- **Idempotent booking** (prevent duplicates)
 - Status tracking (pending, confirmed, checked-in, checked-out, cancelled)
 - Multi-channel source tracking (direct, phone, email, OTA, agency)
-- Transaction-based booking (MongoDB sessions)
-- Commission tracking (for agency bookings)
+- **Transaction-based booking** (MongoDB sessions)
+- Commission tracking for agency bookings
+- Price calculation with timezone support
 
-#### 📊 Analytics & Reporting
-- Dashboard overview (today's check-ins/outs, revenue, occupancy)
-- Occupancy rate tracking (daily, weekly, monthly)
-- Revenue reports with trends
-- Average Daily Rate (ADR) calculation
-- Revenue per Available Room (RevPAR)
-- Reservations by source/rate plan breakdown
-- Top performing room types
-
-#### 🔔 Notifications
-- Email notifications (booking, cancellation)
-- In-app notification center
-- Configurable notification preferences
+#### 🏢 Agency Management
+- Agency registration & profile management
+- Hotel-Agency contract management
+- Commission rate & payment terms
+- Contract validity periods
+- **B2B booking workflows**
+- Agency statistics & performance tracking
 
 #### 🔐 Security & Compliance
-- Multi-user access with roles (org admin, staff)
-- Audit logging for all critical operations
-- Idempotency support (prevent duplicate bookings)
-- GDPR-ready data handling
+- JWT-based authentication
+- Role-based authorization
+- Password hashing (bcrypt)
+- Audit logging for critical operations
+- Idempotency support
+- Multi-tenant data isolation
+- CORS protection
+- Security headers (Helmet)
 
-### 🚀 Planned Features (Post-MVP)
+### 🚀 Upcoming Features
 
-#### Phase 2: Integrations (Month 4-6)
-- PMS integration (Opera, Mews, Clock)
-- OTA channels (Booking.com, Expedia)
-- Payment gateways (Stripe, PayPal)
-- Email automation (Resend, SendGrid)
+#### Phase 1: Code Quality & Security (1-2 weeks)
+- Response helper utilities
+- Error handler middleware
+- Async handler wrapper
+- Input validation & sanitization
+- Rate limiting (express-rate-limit + Redis)
+- Security middleware consolidation
 
-#### Phase 3: Agency Module (Month 7-9)
-- Agency registration & CRM
-- Hotel discovery & search
-- AI-powered offer builder
-- Multi-hotel packages
-- Commission management
+#### Phase 2: Analytics & Reporting (2-3 weeks)
+- Dashboard overview (arrivals, departures, revenue)
+- Occupancy reports (daily, weekly, monthly)
+- Revenue reports with trends
+- ADR (Average Daily Rate) calculation
+- RevPAR (Revenue per Available Room)
+- Booking source analysis
 
-#### Phase 4: Traveler Module (Month 10-12)
-- AI travel planner
-- Personalized recommendations
-- Itinerary builder
-- Local deals finder
+#### Phase 3: Integrations (4-6 weeks)
+- Email service (Resend/SendGrid)
+- Payment gateways (Stripe)
+- SMS notifications (Twilio)
+- PMS integrations (optional)
 
 ---
 
 ## 🛠 Tech Stack
 
-### Frontend
-- **Framework:** React 18 with TypeScript
-- **State Management:** Redux Toolkit
-- **Styling:** Tailwind CSS
-- **Routing:** React Router v6
-- **Forms:** React Hook Form + Zod validation
-- **Charts:** Recharts
-- **Icons:** Lucide React
-- **Notifications:** Sonner
-- **Build Tool:** Vite
-
-### Backend
+### Backend (Current Implementation)
 - **Runtime:** Node.js 20 LTS
-- **Framework:** Express.js with TypeScript
-- **Database:** MongoDB with Mongoose ODM
-- **Caching:** Redis (Upstash)
-- **Authentication:** JWT (JSON Web Tokens)
-- **Validation:** express-validator / Zod
-- **Security:** Helmet, CORS, bcrypt
-- **Logging:** Winston + Morgan
+- **Framework:** Express.js (CommonJS)
+- **Database:** MongoDB 7.0 with Mongoose ODM
+- **Authentication:** JWT (access + refresh tokens)
+- **Security:** Helmet, CORS, bcrypt, express-validator
+- **Logging:** Morgan (HTTP) + Winston (application)
+- **Compression:** compression middleware
+- **Utilities:** date-fns, validator
+
+### Planned Additions
+- **Caching:** Redis (Upstash) for rate limiting & sessions
+- **Email:** Resend or Nodemailer
+- **Testing:** Jest + Supertest
+- **Documentation:** Swagger/OpenAPI
+- **Monitoring:** Sentry (error tracking)
 
 ### Infrastructure
-- **Frontend Hosting:** Vercel
-- **Backend Hosting:** Railway
-- **Database:** MongoDB Atlas
-- **Cache:** Upstash Redis
-- **Storage:** Cloudflare R2 (S3-compatible)
-- **Email:** Resend
-- **Monitoring:** Sentry (error tracking)
+- **Database:** MongoDB Atlas (M0 free tier or M10)
+- **Replica Set:** Required for transactions
+- **Backend Hosting:** Railway or Render
+- **Cache:** Upstash Redis (free tier)
+- **Email:** Resend (free tier)
 
 ### Development Tools
 - **Version Control:** Git + GitHub
 - **API Testing:** Postman
 - **Database GUI:** MongoDB Compass
-- **Container:** Docker + Docker Compose
-- **CI/CD:** GitHub Actions
 - **Code Quality:** ESLint + Prettier
+- **Container:** Docker + Docker Compose (optional)
 
 ---
 
@@ -191,233 +271,211 @@ TravelSync provides:
 
 ### Prerequisites
 
-- Node.js 20+ ([Download](https://nodejs.org/))
-- MongoDB 7.0+ (local or [Atlas](https://www.mongodb.com/cloud/atlas))
-- Docker Desktop (optional but recommended)
-- Git
+- **Node.js 20+** ([Download](https://nodejs.org/))
+- **MongoDB 7.0+** - Local or [Atlas](https://www.mongodb.com/cloud/atlas)
+  - ⚠️ **Replica Set required** for transactions
+- **Git**
+- **MongoDB Compass** (optional, for database GUI)
 
 ### Installation
 
 #### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/yourusername/travelsync.git
-cd travelsync
+git clone https://github.com/yourusername/travelsync-backend.git
+cd travelsync-backend
 ```
 
 #### 2. Install Dependencies
 
 ```bash
-# Install root dependencies (if using monorepo)
-npm install
-
-# Install backend dependencies
-cd apps/backend
-npm install
-
-# Install frontend dependencies
-cd ../frontend
 npm install
 ```
 
 #### 3. Environment Setup
 
-**Backend (.env)**
-
-Create `apps/backend/.env`:
+Create `.env` file in the root directory:
 
 ```env
 # Server
 NODE_ENV=development
-PORT=5000
+PORT=8000
 
-# Database
-MONGODB_URI=mongodb://localhost:27017/travelsync
-# Or use MongoDB Atlas:
+# Database (MongoDB Replica Set for transactions)
+MONGODB_URI=mongodb://localhost:27017,localhost:27018,localhost:27019/travelsync?replicaSet=rs0
+# Or use MongoDB Atlas (automatically uses replica set):
 # MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/travelsync
 
-# Redis (optional for development)
-REDIS_URL=redis://localhost:6379
-
 # JWT
-JWT_ACCESS_SECRET=your-super-secret-access-key-min-32-chars
-JWT_REFRESH_SECRET=your-super-secret-refresh-key-min-32-chars
+JWT_ACCESS_SECRET=your-super-secret-access-key-min-32-chars-long
+JWT_REFRESH_SECRET=your-super-secret-refresh-key-min-32-chars-long
 JWT_ACCESS_EXPIRES_IN=15m
 JWT_REFRESH_EXPIRES_IN=7d
 
-# Frontend URL (CORS)
-FRONTEND_URL=http://localhost:5173
+# CORS (comma-separated origins)
+CORS_ORIGIN=http://localhost:3000,http://localhost:5173
 
-# Email (Resend)
-RESEND_API_KEY=your-resend-api-key
+# Rate Limiting (future)
+RATE_LIMIT_WINDOW=15
+RATE_LIMIT_MAX=100
 
-# File Upload (Cloudflare R2 - optional for MVP)
-R2_ACCOUNT_ID=your-account-id
-R2_ACCESS_KEY_ID=your-access-key
-R2_SECRET_ACCESS_KEY=your-secret-key
-R2_BUCKET_NAME=travelsync-uploads
+# Email (future)
+# RESEND_API_KEY=your-resend-api-key
+# FROM_EMAIL=noreply@travelsync.io
 ```
 
-**Frontend (.env)**
+#### 4. Database Setup
 
-Create `apps/frontend/.env`:
+**Option A: MongoDB Atlas (Recommended for production)**
 
-```env
-VITE_API_URL=http://localhost:5000/api/v1
-```
+1. Create account at [mongodb.com/cloud/atlas](https://www.mongodb.com/cloud/atlas)
+2. Create M0 (free) or M10 cluster
+3. Create database user
+4. Whitelist IP (0.0.0.0/0 or specific IPs)
+5. Get connection string
+6. Update `MONGODB_URI` in `.env`
 
-#### 4. Database Setup (Using Docker - Recommended)
+**Option B: Local MongoDB with Replica Set**
 
+See [docs/MONGODB_TRANSACTIONS_REPLICA_SET.md](./MONGODB_TRANSACTIONS_REPLICA_SET.md) for detailed setup.
+
+Quick setup with Docker:
 ```bash
-# Start MongoDB + Redis containers
+# See docs/MONGODB_TRANSACTIONS_REPLICA_SET.md for docker-compose.yml
 docker-compose up -d
-
-# Verify containers are running
-docker ps
 ```
-
-Or use MongoDB Atlas (cloud):
-1. Create free account at [mongodb.com/cloud/atlas](https://www.mongodb.com/cloud/atlas)
-2. Create cluster
-3. Get connection string
-4. Update `MONGODB_URI` in `.env`
 
 #### 5. Run the Application
 
-**Option A: Run Separately**
-
 ```bash
-# Terminal 1 - Backend
-cd apps/backend
+# Development mode (with nodemon)
 npm run dev
 
-# Terminal 2 - Frontend
-cd apps/frontend
-npm run dev
+# Production mode
+npm start
 ```
 
-**Option B: Run with Concurrently (if configured)**
+#### 6. Verify Installation
 
-```bash
-# From root directory
-npm run dev
+- **Health Check:** http://localhost:8000/health
+- **API Base:** http://localhost:8000/api/v1
+
+Expected response:
+```json
+{
+  "status": "ok",
+  "timestamp": "2025-12-26T10:00:00.000Z",
+  "uptime": 123.45,
+  "environment": "development"
+}
 ```
-
-#### 6. Access the Application
-
-- **Frontend:** http://localhost:5173
-- **Backend API:** http://localhost:5000/api/v1
-- **API Health Check:** http://localhost:5000/api/v1/health
 
 #### 7. Create First Admin Account
 
-Navigate to http://localhost:5173/register and create your first hotel admin account.
+Use Postman or curl:
+
+```bash
+curl -X POST http://localhost:8000/api/v1/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "admin@hotel.com",
+    "password": "SecurePassword123!",
+    "first_name": "John",
+    "last_name": "Doe",
+    "organization_name": "Grand Hotel",
+    "organization_type": "HOTEL"
+  }'
+```
 
 ---
 
 ## 📁 Project Structure
 
 ```
-travelsync/
-├── apps/
-│   ├── backend/                    # Node.js + Express API
-│   │   ├── src/
-│   │   │   ├── config/            # Configuration (database, env)
-│   │   │   ├── controllers/       # Route controllers
-│   │   │   ├── middlewares/       # Auth, validation, error, multi-tenant
-│   │   │   ├── models/            # Mongoose models
-│   │   │   │   ├── Organization.ts
-│   │   │   │   ├── User.ts
-│   │   │   │   ├── Property.ts
-│   │   │   │   ├── RoomType.ts
-│   │   │   │   ├── RatePlan.ts
-│   │   │   │   ├── Price.ts
-│   │   │   │   ├── Inventory.ts
-│   │   │   │   ├── Reservation.ts
-│   │   │   │   ├── AuditLog.ts
-│   │   │   │   └── Notification.ts
-│   │   │   ├── routes/            # API routes
-│   │   │   │   ├── auth.routes.ts
-│   │   │   │   ├── organizations.routes.ts
-│   │   │   │   ├── properties.routes.ts
-│   │   │   │   ├── roomTypes.routes.ts
-│   │   │   │   ├── ratePlans.routes.ts
-│   │   │   │   ├── prices.routes.ts
-│   │   │   │   ├── inventory.routes.ts
-│   │   │   │   ├── reservations.routes.ts
-│   │   │   │   └── analytics.routes.ts
-│   │   │   ├── services/          # Business logic
-│   │   │   │   ├── reservationService.ts
-│   │   │   │   ├── pricingService.ts
-│   │   │   │   ├── inventoryService.ts
-│   │   │   │   └── analyticsService.ts
-│   │   │   ├── utils/             # Helper functions
-│   │   │   ├── types/             # TypeScript types
-│   │   │   └── server.ts          # Express app entry
-│   │   ├── tests/                 # Backend tests
-│   │   ├── .env.example           # Example environment variables
-│   │   ├── tsconfig.json          # TypeScript config
-│   │   └── package.json
-│   │
-│   └── frontend/                   # React + TypeScript SPA
-│       ├── public/                # Static assets
-│       ├── src/
-│       │   ├── components/        # Reusable components
-│       │   │   ├── common/        # Buttons, inputs, modals
-│       │   │   ├── layout/        # Header, sidebar, footer
-│       │   │   └── features/      # Feature-specific components
-│       │   ├── pages/             # Page components
-│       │   │   ├── auth/          # Login, register
-│       │   │   ├── dashboard/     # Dashboard
-│       │   │   ├── properties/    # Property management
-│       │   │   ├── room-types/    # Room type management
-│       │   │   ├── rate-plans/    # Rate plan management
-│       │   │   ├── prices/        # Pricing management
-│       │   │   ├── inventory/     # Inventory management
-│       │   │   ├── reservations/  # Reservation management
-│       │   │   └── settings/      # Settings pages
-│       │   ├── store/             # Redux store
-│       │   │   ├── slices/        # Redux slices
-│       │   │   │   ├── authSlice.ts
-│       │   │   │   ├── organizationSlice.ts
-│       │   │   │   ├── propertySlice.ts
-│       │   │   │   ├── reservationSlice.ts
-│       │   │   │   └── uiSlice.ts
-│       │   │   └── store.ts       # Store configuration
-│       │   ├── services/          # API services
-│       │   ├── hooks/             # Custom React hooks
-│       │   ├── utils/             # Helper functions
-│       │   ├── types/             # TypeScript types
-│       │   ├── App.tsx            # Root component
-│       │   └── main.tsx           # Entry point
-│       ├── tests/                 # Frontend tests
-│       ├── .env.example
-│       ├── index.html
-│       ├── tailwind.config.js
-│       ├── tsconfig.json
-│       └── package.json
-│
-├── packages/                       # Shared packages (optional)
-│   ├── types/                     # Shared TypeScript types
-│   └── utils/                     # Shared utilities
-│
-├── docs/                          # Documentation
-│   ├── PROJECT_CHARTER.md
-│   ├── DATABASE_SCHEMA.md         # Original MongoDB schema
-│   ├── DATABASE_SCHEMA_HYBRID.md  # **NEW:** Professional schema
-│   ├── API_DESIGN.md
-│   ├── TECH_STACK.md
-│   └── ROADMAP.md
-│
-├── .github/                       # GitHub-specific files
-│   └── workflows/                 # CI/CD workflows
-│       ├── backend-ci.yml
-│       └── frontend-ci.yml
-│
-├── docker-compose.yml             # Local development setup
+travelsync-backend/
+├── src/
+│   ├── config/
+│   │   └── database.js              # MongoDB connection
+│   ├── controllers/
+│   │   ├── base.js                  # BaseController (DRY pattern)
+│   │   ├── auth.js                  # Authentication
+│   │   ├── organization.js          # Organizations
+│   │   ├── property.js              # Properties (Hotels)
+│   │   ├── roomType.js              # Room Types
+│   │   ├── ratePlan.js              # Rate Plans
+│   │   ├── price.js                 # Prices
+│   │   ├── inventory.js             # Inventory
+│   │   ├── reservation.js           # Reservations
+│   │   ├── agency.js                # Agencies
+│   │   ├── agencyContract.js        # Agency Contracts
+│   │   └── ai/
+│   │       └── pricingAI.js         # AI Pricing
+│   ├── middlewares/
+│   │   ├── auth.js                  # JWT authentication
+│   │   ├── asyncHandler.js          # Async error handler (planned)
+│   │   └── errorHandler.js          # Error handler (planned)
+│   ├── models/
+│   │   ├── index.js                 # Model exports
+│   │   ├── Organization.js          # Organizations
+│   │   ├── User.js                  # Users
+│   │   ├── Property.js              # Properties
+│   │   ├── RoomType.js              # Room Types
+│   │   ├── RatePlan.js              # Rate Plans
+│   │   ├── Price.js                 # Prices
+│   │   ├── Inventory.js             # Inventory
+│   │   ├── Reservation.js           # Reservations
+│   │   ├── Agency.js                # Agencies
+│   │   ├── AgencyContract.js        # Agency Contracts
+│   │   ├── AuditLog.js              # Audit Logs
+│   │   ├── Payment.js               # Payments (B2C - disabled)
+│   │   ├── Review.js                # Reviews (B2C - disabled)
+│   │   ├── Traveler.js              # Travelers (B2C - disabled)
+│   │   ├── Trip.js                  # Trips (B2C - disabled)
+│   │   └── Wishlist.js              # Wishlists (B2C - disabled)
+│   ├── routes/
+│   │   ├── index.js                 # Route aggregator
+│   │   ├── auth.js                  # Auth routes
+│   │   ├── organization.js          # Organization routes
+│   │   ├── property.js              # Property routes
+│   │   ├── roomType.js              # Room type routes
+│   │   ├── ratePlan.js              # Rate plan routes
+│   │   ├── price.js                 # Price routes
+│   │   ├── inventory.js             # Inventory routes
+│   │   ├── reservation.js           # Reservation routes
+│   │   ├── agency.js                # Agency routes
+│   │   ├── agencyContract.js        # Agency contract routes
+│   │   └── ai/
+│   │       └── pricing.routes.js    # AI pricing routes
+│   ├── services/
+│   │   ├── reservation.service.js   # Reservation business logic
+│   │   └── pricingAI.service.js     # AI pricing service
+│   ├── utils/
+│   │   ├── jwt.js                   # JWT utilities
+│   │   ├── email.js                 # Email utilities (planned)
+│   │   ├── password.js              # Password utilities
+│   │   ├── response.js              # Response helpers (planned)
+│   │   ├── validation.js            # Validation helpers (planned)
+│   │   └── queryBuilder.js          # Query builder (planned)
+│   └── server.js                    # Express app entry
+├── docs/                            # Documentation
+│   ├── README.md                    # This file
+│   ├── PROJE_ANALIZ_VE_DEVAM_PLANI.md  # Detailed project plan
+│   ├── ROADMAP.md                   # Development roadmap
+│   ├── CODE_REFACTORING_PLAN.md     # Refactoring guide
+│   ├── AI_INTEGRATION_SUMMARY.md    # AI pricing documentation
+│   ├── MONGODB_TRANSACTIONS_REPLICA_SET.md  # Transaction setup
+│   ├── TYPESCRIPT_CLEANUP_SUMMARY.md  # TypeScript cleanup notes
+│   ├── AGENCY_HOTEL_FIXES_SUMMARY.md  # Agency fixes
+│   ├── DUPLICATE_INDEX_FINAL_STATUS.md  # Index fixes
+│   ├── DATABASE_SCHEMA.md           # Original schema
+│   ├── DATABASE_SCHEMA_HYBRID.md    # Professional schema
+│   ├── API_DESIGN.md                # API documentation
+│   ├── TECH_STACK.md                # Technology decisions
+│   └── PROJECT_CHARTER.md           # Project charter
+├── .env.example                     # Example environment variables
 ├── .gitignore
-├── README.md
-└── package.json                   # Root package.json (monorepo)
+├── package.json
+└── README.md                        # Project overview
 ```
 
 ---
@@ -426,178 +484,395 @@ travelsync/
 
 ### Base URL
 ```
-Development: http://localhost:5000/api/v1
+Development: http://localhost:8000/api/v1
 Production:  https://api.travelsync.io/v1
 ```
 
 ### Authentication
+
 All protected endpoints require JWT token in the `Authorization` header:
 
 ```
-Authorization: Bearer <your_access_token>
+Authorization: Bearer <access_token>
 ```
 
-### Example Endpoints
+### Core Endpoints
 
 **Authentication**
 ```http
-POST /auth/register        # Register new hotel + admin
-POST /auth/login           # Login
-POST /auth/refresh         # Refresh access token
-POST /auth/logout          # Logout
-GET  /auth/me              # Get current user
+POST   /api/v1/auth/register        # Register new hotel + admin
+POST   /api/v1/auth/login           # Login
+POST   /api/v1/auth/refresh         # Refresh access token
+POST   /api/v1/auth/logout          # Logout
+GET    /api/v1/auth/me              # Get current user
 ```
 
-**Rooms**
+**Properties (Hotels)**
 ```http
-GET    /rooms              # List all rooms (with filters)
-GET    /rooms/:id          # Get single room
-POST   /rooms              # Create room
-PATCH  /rooms/:id          # Update room
-DELETE /rooms/:id          # Delete room (soft)
+GET    /api/v1/properties           # List properties
+GET    /api/v1/properties/:id       # Get property
+POST   /api/v1/properties           # Create property
+PUT    /api/v1/properties/:id       # Update property
+DELETE /api/v1/properties/:id       # Delete property
+```
+
+**Room Types**
+```http
+GET    /api/v1/room-types           # List room types
+GET    /api/v1/room-types/:id       # Get room type
+POST   /api/v1/room-types           # Create room type
+PUT    /api/v1/room-types/:id       # Update room type
+DELETE /api/v1/room-types/:id       # Delete room type
+```
+
+**Rate Plans**
+```http
+GET    /api/v1/rate-plans           # List rate plans
+GET    /api/v1/rate-plans/:id       # Get rate plan
+POST   /api/v1/rate-plans           # Create rate plan
+PUT    /api/v1/rate-plans/:id       # Update rate plan
+DELETE /api/v1/rate-plans/:id       # Delete rate plan
+```
+
+**Prices**
+```http
+GET    /api/v1/prices               # List prices (with filters)
+PUT    /api/v1/prices/bulk          # Bulk update prices
+```
+
+**Inventory**
+```http
+GET    /api/v1/inventory            # List inventory
+PUT    /api/v1/inventory/bulk       # Bulk update inventory
+POST   /api/v1/inventory/check      # Check availability
 ```
 
 **Reservations**
 ```http
-GET    /reservations       # List all reservations
-GET    /reservations/:id   # Get single reservation
-POST   /reservations       # Create reservation
-PATCH  /reservations/:id   # Update reservation
-POST   /reservations/:id/cancel    # Cancel reservation
-POST   /reservations/:id/check-in  # Check-in guest
-POST   /reservations/:id/check-out # Check-out guest
+GET    /api/v1/reservations         # List reservations
+GET    /api/v1/reservations/:id     # Get reservation
+POST   /api/v1/reservations         # Create reservation
+PUT    /api/v1/reservations/:id     # Update reservation
+POST   /api/v1/reservations/:id/cancel     # Cancel reservation
+POST   /api/v1/reservations/:id/check-in   # Check-in
+POST   /api/v1/reservations/:id/check-out  # Check-out
 ```
 
-**Analytics**
+**Agencies**
 ```http
-GET /analytics/dashboard   # Dashboard overview stats
-GET /analytics/occupancy   # Occupancy report
-GET /analytics/revenue     # Revenue report
+GET    /api/v1/agencies             # List agencies
+GET    /api/v1/agencies/:id         # Get agency
+POST   /api/v1/agencies             # Create agency
+PUT    /api/v1/agencies/:id         # Update agency
+DELETE /api/v1/agencies/:id         # Delete agency
 ```
 
-For full API documentation, see [API_DESIGN.md](./docs/API_DESIGN.md)
+**Agency Contracts**
+```http
+GET    /api/v1/agency-contracts     # List contracts
+GET    /api/v1/agency-contracts/:id # Get contract
+POST   /api/v1/agency-contracts     # Create contract
+PUT    /api/v1/agency-contracts/:id # Update contract
+DELETE /api/v1/agency-contracts/:id # Delete contract
+POST   /api/v1/agency-contracts/:id/activate  # Activate
+POST   /api/v1/agency-contracts/:id/suspend   # Suspend
+```
+
+**AI Pricing**
+```http
+POST   /api/v1/ai/pricing/suggestions  # Get AI price suggestions
+POST   /api/v1/ai/pricing/apply        # Apply AI suggestions
+GET    /api/v1/ai/pricing/analytics    # Get pricing analytics
+```
+
+For detailed API documentation, see [docs/API_DESIGN.md](./API_DESIGN.md)
 
 ---
 
-## 🚀 Deployment
+## 🔒 Security
 
-### Frontend (Vercel)
+### Current Implementation
 
-1. Push code to GitHub
-2. Visit [vercel.com](https://vercel.com)
-3. Import your repository
-4. Set environment variables:
-   - `VITE_API_URL=https://api.travelsync.io/v1`
-5. Deploy!
+- ✅ **JWT Authentication** - Access + refresh tokens
+- ✅ **Password Hashing** - bcrypt with salt rounds
+- ✅ **Security Headers** - Helmet middleware
+- ✅ **CORS Protection** - Configurable origins
+- ✅ **Multi-tenant Isolation** - Organization-based data separation
+- ✅ **Audit Logging** - Track critical operations
+- ✅ **Idempotency** - Prevent duplicate operations
 
-### Backend (Railway)
+### Planned Security Enhancements
 
-1. Visit [railway.app](https://railway.app)
-2. Create new project
-3. Connect GitHub repository
-4. Add environment variables (see `.env.example`)
-5. Add MongoDB plugin (or use Atlas)
-6. Deploy!
+- [ ] **Rate Limiting** - Express-rate-limit + Redis store
+- [ ] **Input Sanitization** - express-mongo-sanitize, xss-clean
+- [ ] **HTTPS Enforcement** - Production-only
+- [ ] **Secure Cookies** - SameSite=strict, secure flag
+- [ ] **CORS Whitelist** - Environment-based allowed origins
+- [ ] **Content Security Policy** - Basic CSP headers
+- [ ] **Dependency Audit** - npm audit + Snyk integration
+- [ ] **Security Testing** - Automated security tests
 
-### Database (MongoDB Atlas)
+### Security Recommendations
 
-1. Create free account at [mongodb.com/cloud/atlas](https://www.mongodb.com/cloud/atlas)
-2. Create M0 (free) cluster
-3. Create database user
-4. Whitelist IP (0.0.0.0/0 for all IPs or specific IPs)
-5. Get connection string
-6. Update `MONGODB_URI` in Railway
+1. **Environment Variables**
+   - Never commit `.env` files
+   - Use strong, random secrets (min 32 chars)
+   - Rotate JWT secrets regularly
 
-For detailed deployment guide, see [DEPLOYMENT.md](./docs/DEPLOYMENT.md) (to be created)
+2. **MongoDB**
+   - Enable authentication
+   - Use replica set for production
+   - Whitelist specific IPs
+   - Regular backups
+
+3. **Production Deployment**
+   - Use HTTPS only
+   - Set `NODE_ENV=production`
+   - Enable rate limiting
+   - Monitor error logs (Sentry)
+   - Regular security updates
+
+See [docs/CODE_REFACTORING_PLAN.md](./CODE_REFACTORING_PLAN.md) for security middleware implementation details.
+
+---
+
+## 🗺️ Roadmap
+
+### Current Phase: Backend MVP (80% Complete)
+
+**Completed:**
+- ✅ Core infrastructure & database
+- ✅ All models & API endpoints
+- ✅ JWT authentication
+- ✅ Multi-tenant architecture
+- ✅ Agency module with contracts
+- ✅ AI dynamic pricing (baseline)
+- ✅ Code cleanup (TypeScript, duplicate indexes)
+
+**In Progress:**
+- ⏳ Code refactoring (helpers, middleware)
+- ⏳ MongoDB replica set setup
+- ⏳ Security hardening
+
+### Phase 1: Code Quality & Testing (1-2 Weeks)
+
+- [ ] Response helper utilities
+- [ ] Error handler middleware
+- [ ] Async handler wrapper
+- [ ] Validation helpers
+- [ ] Security middleware (rate limiting, sanitization)
+- [ ] Postman collection
+- [ ] Unit & integration tests
+
+### Phase 2: Analytics & Features (2-3 Weeks)
+
+- [ ] Analytics endpoints (dashboard, occupancy, revenue)
+- [ ] Email notifications (Resend)
+- [ ] API documentation (Swagger)
+- [ ] Advanced AI pricing (ML model)
+
+### Phase 3: Frontend (4-6 Weeks)
+
+- [ ] React + TypeScript + Tailwind setup
+- [ ] Redux Toolkit state management
+- [ ] Dashboard UI
+- [ ] Property & reservation management
+- [ ] Pricing calendar
+- [ ] Analytics charts
+
+### Phase 4: Integrations (Post-MVP)
+
+- [ ] PMS integrations
+- [ ] Payment gateways (Stripe)
+- [ ] SMS notifications (Twilio)
+- [ ] Calendar sync (Google Calendar, iCal)
+
+### Phase 5: B2C Module (Future)
+
+- [ ] Traveler registration
+- [ ] Trip planning
+- [ ] Reviews & ratings
+- [ ] Wishlist
+
+See [docs/ROADMAP.md](./ROADMAP.md) for detailed sprint planning.
+
+---
+
+## 📚 Documentation
+
+### Getting Started
+- [README.md](./README.md) - This file
+- [TECH_STACK.md](./TECH_STACK.md) - Technology decisions
+- [PROJECT_CHARTER.md](./PROJECT_CHARTER.md) - Project goals & scope
+
+### Architecture & Design
+- [DATABASE_SCHEMA_HYBRID.md](./DATABASE_SCHEMA_HYBRID.md) - Professional schema
+- [API_DESIGN.md](./API_DESIGN.md) - API documentation
+- [MONGODB_TRANSACTIONS_REPLICA_SET.md](./MONGODB_TRANSACTIONS_REPLICA_SET.md) - Transaction setup
+
+### Development Plans
+- [PROJE_ANALIZ_VE_DEVAM_PLANI.md](./PROJE_ANALIZ_VE_DEVAM_PLANI.md) - Detailed project analysis (Turkish)
+- [ROADMAP.md](./ROADMAP.md) - Development roadmap
+- [CODE_REFACTORING_PLAN.md](./CODE_REFACTORING_PLAN.md) - Refactoring guide
+
+### Feature Documentation
+- [AI_INTEGRATION_SUMMARY.md](./AI_INTEGRATION_SUMMARY.md) - AI pricing documentation
+- [AI_QUICK_START.md](./AI_QUICK_START.md) - AI pricing quick start
+- [AI_INTEGRATION_PLAN.md](./AI_INTEGRATION_PLAN.md) - AI integration plan
+
+### Fixes & Changes
+- [TYPESCRIPT_CLEANUP_SUMMARY.md](./TYPESCRIPT_CLEANUP_SUMMARY.md) - TypeScript cleanup
+- [AGENCY_HOTEL_FIXES_SUMMARY.md](./AGENCY_HOTEL_FIXES_SUMMARY.md) - Agency module fixes
+- [DUPLICATE_INDEX_FINAL_STATUS.md](./DUPLICATE_INDEX_FINAL_STATUS.md) - Index optimization
+- [B2C_MODULE_SKELETON.md](./B2C_MODULE_SKELETON.md) - B2C module status
 
 ---
 
 ## 🧪 Testing
 
-### Run Backend Tests
+### Manual Testing
+
+Use Postman for API testing:
+
+1. Import collection (to be created)
+2. Set environment variables
+3. Test authentication flow
+4. Test CRUD operations
+5. Test edge cases
+
+### Automated Testing (Planned)
+
 ```bash
-cd apps/backend
-npm test                  # Run all tests
-npm run test:watch        # Watch mode
-npm run test:coverage     # Coverage report
+# Run all tests
+npm test
+
+# Run with coverage
+npm run test:coverage
+
+# Run in watch mode
+npm run test:watch
 ```
 
-### Run Frontend Tests
+Test coverage goals:
+- Unit tests: 80%+
+- Integration tests: 70%+
+- E2E tests: Key user flows
+
+---
+
+## 🚀 Deployment
+
+### Prerequisites
+
+- MongoDB Atlas cluster (M0 or M10)
+- Railway/Render account
+- Domain name (optional)
+
+### Environment Variables (Production)
+
+```env
+NODE_ENV=production
+PORT=8000
+MONGODB_URI=mongodb+srv://...
+JWT_ACCESS_SECRET=<long-random-secret>
+JWT_REFRESH_SECRET=<long-random-secret>
+CORS_ORIGIN=https://app.travelsync.io
+RATE_LIMIT_WINDOW=15
+RATE_LIMIT_MAX=100
+```
+
+### Deployment Steps
+
+1. **MongoDB Atlas Setup**
+   - Create M10 cluster (replica set included)
+   - Configure IP whitelist
+   - Create database user
+   - Get connection string
+
+2. **Railway Deployment**
+   - Connect GitHub repository
+   - Add environment variables
+   - Deploy!
+
+3. **Domain Setup**
+   - Point domain to Railway
+   - Enable HTTPS
+   - Configure DNS
+
+See detailed deployment guide (to be created) for step-by-step instructions.
+
+---
+
+## 📝 Scripts
+
 ```bash
-cd apps/frontend
-npm test                  # Run all tests
-npm run test:watch        # Watch mode
-npm run test:coverage     # Coverage report
+# Development
+npm run dev              # Start with nodemon (auto-reload)
+npm start                # Start production server
+
+# Code Quality
+npm run lint             # Run ESLint
+npm run lint:fix         # Fix ESLint issues
+npm run format           # Format with Prettier
+
+# Testing
+npm test                 # Run tests (planned)
+npm run test:watch       # Watch mode (planned)
+npm run test:coverage    # Coverage report (planned)
 ```
 
 ---
 
 ## 🤝 Contributing
 
-Contributions are welcome! Please follow these steps:
+This is currently a solo developer project. Contributions will be welcomed after MVP launch.
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+### Development Workflow
+
+1. Create feature branch from `main`
+2. Make changes
+3. Test thoroughly
+4. Commit with meaningful messages
+5. Create pull request
 
 ### Code Style
 
-- Follow existing code style
-- Use TypeScript
-- Write meaningful commit messages
-- Add tests for new features
+- Follow existing code patterns
+- Use CommonJS (require/module.exports)
+- Write clear comments
 - Update documentation
 
 ---
 
-## 📝 License
+## 📞 Support
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+- **Email:** support@travelsync.io
+- **GitHub Issues:** [Create an issue](https://github.com/yourusername/travelsync-backend/issues)
+- **Documentation:** [docs/](./docs/)
 
 ---
 
-## 👥 Team
+## 📄 License
 
-- **Solo Developer:** [Your Name]
-- **Contact:** your.email@example.com
-- **Website:** https://travelsync.io
+This project is licensed under the MIT License - see the [LICENSE](../LICENSE) file for details.
 
 ---
 
 ## 🙏 Acknowledgments
 
-- React team for amazing framework
-- MongoDB team for flexible database
-- Vercel & Railway for deployment platforms
+- Express.js team for the framework
+- MongoDB team for the database
 - All open-source contributors
+- Tourism industry professionals for feedback
 
 ---
 
-## 📮 Support
+## ⭐ Project Status
 
-- **Documentation:** [docs.travelsync.io](https://docs.travelsync.io)
-- **Email:** support@travelsync.io
-- **GitHub Issues:** [Create an issue](https://github.com/yourusername/travelsync/issues)
-
----
-
-## 🗺️ Roadmap
-
-- [x] MVP: Hotel Module (Rooms, Reservations, Analytics)
-- [ ] Phase 2: PMS & OTA Integrations
-- [ ] Phase 3: Agency Module
-- [ ] Phase 4: Traveler Module (B2C)
-- [ ] Phase 5: Mobile Apps
-
-See [ROADMAP.md](./docs/ROADMAP.md) for detailed timeline.
-
----
-
-## ⭐ Star History
-
-If you find this project useful, please consider giving it a star! ⭐
+**Current Version:** 1.0.0-beta
+**Status:** Active Development
+**Last Updated:** December 26, 2025
+**Next Milestone:** Code Refactoring & Security Hardening
 
 ---
 
