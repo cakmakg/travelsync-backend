@@ -105,7 +105,7 @@ const register = async (req, res) => {
       success: true,
       data: {
         user: userResponse,
-        tokens,
+        ...tokens,
       },
       message: 'User registered successfully',
     });
@@ -208,7 +208,7 @@ const login = async (req, res) => {
       success: true,
       data: {
         user: userResponse,
-        tokens,
+        ...tokens,
       },
       message: 'Login successful',
     });
@@ -267,9 +267,9 @@ const getProfile = async (req, res) => {
  */
 const refreshToken = async (req, res) => {
   try {
-    const { refreshToken } = req.body;
+    const { refresh_token } = req.body;
 
-    if (!refreshToken) {
+    if (!refresh_token) {
       return res.status(400).json({
         success: false,
         error: {
@@ -279,7 +279,7 @@ const refreshToken = async (req, res) => {
     }
 
     // Verify refresh token
-    const decoded = verifyRefreshToken(refreshToken);
+    const decoded = verifyRefreshToken(refresh_token);
 
     // Get user
     const user = await User.findById(decoded._id);
@@ -299,7 +299,7 @@ const refreshToken = async (req, res) => {
     res.status(200).json({
       success: true,
       data: {
-        tokens,
+        ...tokens,
       },
       message: 'Token refreshed successfully',
     });

@@ -76,7 +76,7 @@ const verifyRefreshToken = (token) => {
 /**
  * Generate both tokens
  * @param {Object} user - User object
- * @returns {Object} { accessToken, refreshToken }
+ * @returns {Object} { access_token, refresh_token }
  */
 const generateTokens = (user) => {
   const payload = {
@@ -87,8 +87,8 @@ const generateTokens = (user) => {
   };
 
   return {
-    accessToken: generateAccessToken(payload),
-    refreshToken: generateRefreshToken(payload),
+    access_token: generateAccessToken(payload),
+    refresh_token: generateRefreshToken(payload),
   };
 };
 
