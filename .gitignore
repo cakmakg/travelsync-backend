@@ -43,5 +43,5 @@ temp/
 # Debug
 debug.log
 
-docs/API_DESIGN.md
-
+# Windows reserved names
+nul
