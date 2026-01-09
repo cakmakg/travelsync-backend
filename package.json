@@ -2,15 +2,15 @@
   "name": "travelsync-backend",
   "version": "1.0.0",
   "description": "TravelSync Hotel Automation Platform - Backend API",
-  "main": "src/server.js",
+  "main": "server/server.js",
   "scripts": {
-    "dev": "nodemon src/server.js",
-    "start": "node src/server.js",
+    "dev": "nodemon server/server.js",
+    "start": "node server/server.js",
     "test": "jest",
     "test:watch": "jest --watch",
-    "lint": "eslint src/**/*.js",
-    "lint:fix": "eslint src/**/*.js --fix",
-    "format": "prettier --write \"src/**/*.js\""
+    "lint": "eslint server/**/*.js",
+    "lint:fix": "eslint server/**/*.js --fix",
+    "format": "prettier --write \"server/**/*.js\""
   },
   "keywords": [
     "hotel",
