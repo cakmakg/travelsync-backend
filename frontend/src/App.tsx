@@ -12,6 +12,7 @@ import RegisterPage from './pages/auth/RegisterPage';
 import DashboardPage from './pages/dashboard/DashboardPage';
 import PropertiesPage from './pages/properties/PropertiesPage';
 import ReservationsPage from './pages/reservations/ReservationsPage';
+import RoomTypesPage from './pages/room-types/RoomTypesPage';
 
 function App() {
   return (
@@ -53,18 +54,17 @@ function App() {
             }
           />
 
-          {/* Placeholder routes */}
+          {/* Room Types */}
           <Route
             path="/room-types"
             element={
               <MainLayout>
-                <div className="text-center py-12">
-                  <h2 className="text-2xl font-bold text-gray-900">Room Types</h2>
-                  <p className="text-gray-600 mt-2">Coming soon...</p>
-                </div>
+                <RoomTypesPage />
               </MainLayout>
             }
           />
+
+          {/* Placeholder routes */}
           <Route
             path="/pricing"
             element={
