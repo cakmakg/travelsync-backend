@@ -2,6 +2,7 @@ import { configureStore } from '@reduxjs/toolkit';
 import authReducer from './slices/authSlice';
 import propertiesReducer from './slices/propertiesSlice';
 import reservationsReducer from './slices/reservationsSlice';
+import roomTypesReducer from './slices/roomTypesSlice';
 import uiReducer from './slices/uiSlice';
 
 export const store = configureStore({
@@ -9,6 +10,7 @@ export const store = configureStore({
     auth: authReducer,
     properties: propertiesReducer,
     reservations: reservationsReducer,
+    roomTypes: roomTypesReducer,
     ui: uiReducer,
   },
   middleware: (getDefaultMiddleware) =>
