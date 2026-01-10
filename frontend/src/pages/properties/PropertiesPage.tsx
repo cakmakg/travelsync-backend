@@ -1,19 +1,51 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
-import { fetchProperties } from '@/store/slices/propertiesSlice';
+import { fetchProperties, deleteProperty } from '@/store/slices/propertiesSlice';
 import Card from '@/components/common/Card';
 import Button from '@/components/common/Button';
-import { Building2, MapPin, Plus } from 'lucide-react';
+import { Building2, MapPin, Plus, Edit2, Trash2 } from 'lucide-react';
+import { toast } from 'sonner';
+import PropertyModal from './PropertyModal';
+import { Property } from '@/types';
 
 export default function PropertiesPage() {
   const dispatch = useAppDispatch();
   const { properties, loading } = useAppSelector((state) => state.properties);
 
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingProperty, setEditingProperty] = useState<Property | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+
   useEffect(() => {
     dispatch(fetchProperties());
   }, [dispatch]);
 
-  if (loading) {
+  const handleAddNew = () => {
+    setEditingProperty(null);
+    setIsModalOpen(true);
+  };
+
+  const handleEdit = (property: Property) => {
+    setEditingProperty(property);
+    setIsModalOpen(true);
+  };
+
+  const handleDelete = async (id: string) => {
+    try {
+      await dispatch(deleteProperty(id)).unwrap();
+      toast.success('Property deleted successfully');
+      setDeleteConfirm(null);
+    } catch (error: any) {
+      toast.error(error || 'Failed to delete property');
+    }
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setEditingProperty(null);
+  };
+
+  if (loading && properties.length === 0) {
     return (
       <div className="flex items-center justify-center h-full">
         <div className="text-center">
@@ -31,7 +63,7 @@ export default function PropertiesPage() {
           <h1 className="text-3xl font-bold text-gray-900">Properties</h1>
           <p className="text-gray-600 mt-2">Manage your hotel properties</p>
         </div>
-        <Button variant="primary" className="flex items-center space-x-2">
+        <Button variant="primary" onClick={handleAddNew} className="flex items-center space-x-2">
           <Plus className="w-5 h-5" />
           <span>Add Property</span>
         </Button>
@@ -43,7 +75,7 @@ export default function PropertiesPage() {
             <Building2 className="w-16 h-16 text-gray-400 mx-auto mb-4" />
             <h3 className="text-lg font-semibold text-gray-900 mb-2">No properties yet</h3>
             <p className="text-gray-600 mb-6">Get started by adding your first property</p>
-            <Button variant="primary" className="inline-flex items-center space-x-2">
+            <Button variant="primary" onClick={handleAddNew} className="inline-flex items-center space-x-2">
               <Plus className="w-5 h-5" />
               <span>Add Property</span>
             </Button>
@@ -68,7 +100,7 @@ export default function PropertiesPage() {
 
                 <div className="flex items-center space-x-2 text-sm text-gray-600">
                   <MapPin className="w-4 h-4" />
-                  <span>{property.address.city}, {property.address.country}</span>
+                  <span>{property.address?.city}, {property.address?.country}</span>
                 </div>
 
                 {property.star_rating && (
@@ -79,19 +111,64 @@ export default function PropertiesPage() {
                   </div>
                 )}
 
-                <div className="flex items-center space-x-2">
-                  <Button variant="outline" size="sm" className="flex-1">
-                    View
+                {property.description && (
+                  <p className="text-sm text-gray-600 line-clamp-2">{property.description}</p>
+                )}
+
+                <div className="flex items-center space-x-2 pt-2 border-t">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleEdit(property)}
+                    className="flex-1 flex items-center justify-center space-x-1"
+                  >
+                    <Edit2 className="w-4 h-4" />
+                    <span>Edit</span>
                   </Button>
-                  <Button variant="primary" size="sm" className="flex-1">
-                    Manage
-                  </Button>
+
+                  {deleteConfirm === property._id ? (
+                    <div className="flex-1 flex items-center space-x-1">
+                      <Button
+                        variant="danger"
+                        size="sm"
+                        onClick={() => handleDelete(property._id)}
+                        className="flex-1"
+                      >
+                        Confirm
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setDeleteConfirm(null)}
+                        className="flex-1"
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setDeleteConfirm(property._id)}
+                      className="flex-1 flex items-center justify-center space-x-1 text-red-600 hover:bg-red-50"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      <span>Delete</span>
+                    </Button>
+                  )}
                 </div>
               </div>
             </Card>
           ))}
         </div>
       )}
+
+      {/* Modal */}
+      <PropertyModal
+        isOpen={isModalOpen}
+        onClose={handleCloseModal}
+        property={editingProperty}
+      />
     </div>
   );
 }
