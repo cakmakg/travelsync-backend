@@ -174,6 +174,46 @@ const PropertySchema = new mongoose.Schema(
       default: false,
     },
 
+    // Vergi Numarası (GoBD uyumluluk için)
+    tax_id: {
+      type: String,
+      trim: true,
+      maxlength: [50, 'Tax ID cannot exceed 50 characters'],
+    },
+
+    // PMS Entegrasyon Ayarları (Protel, SIHOT, vb.)
+    pms_settings: {
+      provider: {
+        type: String,
+        enum: ['protel', 'sihot', 'opera', 'mews', 'manual', null],
+        default: null,
+      },
+      api_key: {
+        type: String,
+        select: false, // Güvenlik: varsayılan sorgularda döndürme
+      },
+      api_secret: {
+        type: String,
+        select: false,
+      },
+      endpoint: {
+        type: String,
+        trim: true,
+      },
+      is_connected: {
+        type: Boolean,
+        default: false,
+      },
+      last_sync: {
+        type: Date,
+      },
+      sync_frequency: {
+        type: String,
+        enum: ['realtime', 'hourly', 'daily', 'manual'],
+        default: 'manual',
+      },
+    },
+
     // Images
     images: [
       {

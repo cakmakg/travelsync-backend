@@ -1,10 +1,11 @@
 import api from './api';
-import { LoginCredentials, RegisterData, User, ApiResponse } from '@/types';
+import { LoginCredentials, RegisterData, User, Organization, ApiResponse } from '@/types';
 
 interface AuthResponse {
   access_token: string;
   refresh_token: string;
   user: User;
+  organization?: Organization;
 }
 
 export const authService = {

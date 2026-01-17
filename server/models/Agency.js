@@ -100,6 +100,34 @@ const AgencySchema = new mongoose.Schema(
       total_revenue: { type: Number, default: 0 },
       total_commission: { type: Number, default: 0 },
     },
+
+    // WhatsApp Bildirim Ayarları (Flash Offer için)
+    whatsapp_settings: {
+      enabled: {
+        type: Boolean,
+        default: false,
+      },
+      phone_number: {
+        type: String,
+        trim: true,
+        // E.164 formatı: +491234567890
+        match: [/^\+[1-9]\d{1,14}$/, 'Geçerli bir telefon numarası girin (+491234567890)'],
+      },
+      verified: {
+        type: Boolean,
+        default: false,
+      },
+      notification_types: {
+        flash_offers: { type: Boolean, default: true },
+        new_reservations: { type: Boolean, default: false },
+        cancellations: { type: Boolean, default: false },
+      },
+      preferred_language: {
+        type: String,
+        enum: ['de', 'en', 'tr'],
+        default: 'de',
+      },
+    },
   },
   {
     timestamps: true,

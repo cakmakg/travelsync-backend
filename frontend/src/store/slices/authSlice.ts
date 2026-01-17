@@ -5,6 +5,7 @@ import { getErrorMessage } from '@/services/api';
 
 const initialState: AuthState = {
   user: null,
+  organization: null,
   accessToken: localStorage.getItem('accessToken'),
   refreshToken: localStorage.getItem('refreshToken'),
   isAuthenticated: !!localStorage.getItem('accessToken'),
@@ -99,6 +100,7 @@ const authSlice = createSlice({
       state.loading = false;
       state.isAuthenticated = true;
       state.user = action.payload.user;
+      state.organization = action.payload.organization || null;
       state.accessToken = action.payload.access_token;
       state.refreshToken = action.payload.refresh_token;
       state.error = null;
@@ -118,6 +120,7 @@ const authSlice = createSlice({
       state.loading = false;
       state.isAuthenticated = true;
       state.user = action.payload.user;
+      state.organization = action.payload.organization || null;
       state.accessToken = action.payload.access_token;
       state.refreshToken = action.payload.refresh_token;
       state.error = null;
@@ -146,6 +149,7 @@ const authSlice = createSlice({
     // Logout
     builder.addCase(logout.fulfilled, (state) => {
       state.user = null;
+      state.organization = null;
       state.accessToken = null;
       state.refreshToken = null;
       state.isAuthenticated = false;

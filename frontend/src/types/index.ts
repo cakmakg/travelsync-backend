@@ -4,8 +4,8 @@ export interface User {
   email: string;
   first_name: string;
   last_name: string;
-  role: 'admin' | 'staff';
-  organization_id: string;
+  role: 'super_admin' | 'admin';
+  organization_id: string | null;
   phone?: string;
   avatar?: string;
   created_at: string;
@@ -13,6 +13,7 @@ export interface User {
 
 export interface AuthState {
   user: User | null;
+  organization: Organization | null;
   accessToken: string | null;
   refreshToken: string | null;
   isAuthenticated: boolean;

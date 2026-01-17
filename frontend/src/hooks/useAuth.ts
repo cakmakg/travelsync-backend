@@ -4,7 +4,7 @@ import { LoginCredentials, RegisterData } from '@/types';
 
 export const useAuth = () => {
   const dispatch = useAppDispatch();
-  const { user, isAuthenticated, loading, error } = useAppSelector((state) => state.auth);
+  const { user, organization, isAuthenticated, loading, error } = useAppSelector((state) => state.auth);
 
   const handleLogin = async (credentials: LoginCredentials) => {
     const result = await dispatch(login(credentials));
@@ -26,6 +26,7 @@ export const useAuth = () => {
 
   return {
     user,
+    organization,
     isAuthenticated,
     loading,
     error,

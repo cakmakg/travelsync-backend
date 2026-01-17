@@ -14,20 +14,23 @@ export default function RoomTypesPage() {
   const { roomTypes, loading } = useAppSelector((state) => state.roomTypes);
   const { properties } = useAppSelector((state) => state.properties);
 
+  // Ensure properties is always an array
+  const safeProperties = Array.isArray(properties) ? properties : [];
+
   const [selectedPropertyId, setSelectedPropertyId] = useState<string>('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingRoomType, setEditingRoomType] = useState<RoomType | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
 
   useEffect(() => {
-    dispatch(fetchProperties());
+    dispatch(fetchProperties({}));
   }, [dispatch]);
 
   useEffect(() => {
     if (selectedPropertyId) {
       dispatch(fetchRoomTypes({ property_id: selectedPropertyId }));
     } else {
-      dispatch(fetchRoomTypes());
+      dispatch(fetchRoomTypes({}));
     }
   }, [dispatch, selectedPropertyId]);
 
@@ -66,7 +69,7 @@ export default function RoomTypesPage() {
   };
 
   const getPropertyName = (propertyId: string) => {
-    const property = properties.find((p) => p._id === propertyId);
+    const property = safeProperties.find((p) => p._id === propertyId);
     return property?.name || 'Unknown Property';
   };
 
@@ -105,7 +108,7 @@ export default function RoomTypesPage() {
             className="flex-1 max-w-xs rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
           >
             <option value="">All Properties</option>
-            {properties.map((property) => (
+            {safeProperties.map((property) => (
               <option key={property._id} value={property._id}>
                 {property.name}
               </option>
@@ -144,9 +147,8 @@ export default function RoomTypesPage() {
                   </div>
                   <button
                     onClick={() => handleToggleActive(roomType._id)}
-                    className={`p-1 rounded transition-colors ${
-                      roomType.is_active ? 'text-green-600 hover:text-green-700' : 'text-gray-400 hover:text-gray-500'
-                    }`}
+                    className={`p-1 rounded transition-colors ${roomType.is_active ? 'text-green-600 hover:text-green-700' : 'text-gray-400 hover:text-gray-500'
+                      }`}
                     title={roomType.is_active ? 'Active - Click to deactivate' : 'Inactive - Click to activate'}
                   >
                     {roomType.is_active ? (
@@ -169,8 +171,8 @@ export default function RoomTypesPage() {
                   <div className="flex items-center space-x-2 text-sm text-gray-600">
                     <Users className="w-4 h-4" />
                     <span>
-                      Max: {roomType.max_occupancy.adults} adults
-                      {roomType.max_occupancy.children > 0 && `, ${roomType.max_occupancy.children} children`}
+                      Max: {roomType.max_occupancy?.adults || 0} adults
+                      {(roomType.max_occupancy?.children || 0) > 0 && `, ${roomType.max_occupancy.children} children`}
                     </span>
                   </div>
 
@@ -264,7 +266,7 @@ export default function RoomTypesPage() {
         isOpen={isModalOpen}
         onClose={handleCloseModal}
         roomType={editingRoomType}
-        properties={properties}
+        properties={safeProperties}
         selectedPropertyId={selectedPropertyId}
       />
     </div>

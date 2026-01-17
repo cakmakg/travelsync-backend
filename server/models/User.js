@@ -50,8 +50,8 @@ const UserSchema = new mongoose.Schema(
 
     role: {
       type: String,
-      enum: ['admin', 'manager', 'staff'],
-      default: 'staff',
+      enum: ['super_admin', 'admin'],
+      default: 'admin',
       required: true,
     },
 
@@ -122,8 +122,8 @@ const UserSchema = new mongoose.Schema(
         push: { type: Boolean, default: true },
       },
     },
-  
-   // Soft delete
+
+    // Soft delete
     deleted_at: {
       type: Date,
       default: null,

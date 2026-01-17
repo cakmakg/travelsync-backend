@@ -8,59 +8,33 @@ const { User, Organization, AuditLog } = require('../models');
 const { generateTokens, verifyRefreshToken } = require('../utils/jwt');
 
 /**
- * Register new user
+ * Register new user with organization (single-step registration)
  * POST /auth/register
+ * Creates both organization and admin user in one request
  */
 const register = async (req, res) => {
   try {
     const {
-      organization_id,
+      // Organization fields
+      organization_name,
+      organization_type,
+      country,
+      timezone,
+      currency,
+      // User fields
       email,
       password,
       first_name,
       last_name,
-      role,
       phone,
     } = req.body;
 
     // Validate required fields
-    if (!organization_id || !email || !password || !first_name || !last_name) {
+    if (!organization_name || !email || !password || !first_name || !last_name) {
       return res.status(400).json({
         success: false,
         error: {
-          message: 'Missing required fields: organization_id, email, password, first_name, last_name',
-        },
-      });
-    }
-
-    // Check if organization exists
-    const organization = await Organization.findById(organization_id);
-    if (!organization) {
-      return res.status(404).json({
-        success: false,
-        error: {
-          message: 'Organization not found.',
-        },
-      });
-    }
-
-    // Check if organization is active
-    if (!organization.is_active) {
-      return res.status(403).json({
-        success: false,
-        error: {
-          message: 'Organization is not active.',
-        },
-      });
-    }
-
-    // Check if email already exists in this organization
-    const existingUser = await User.findOne({ organization_id, email });
-    if (existingUser) {
-      return res.status(409).json({
-        success: false,
-        error: {
-          message: 'Email already registered in this organization.',
+          message: 'Missing required fields: organization_name, email, password, first_name, last_name',
         },
       });
     }
@@ -75,24 +49,49 @@ const register = async (req, res) => {
       });
     }
 
-    // Create user
+    // Check if email already exists globally
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(409).json({
+        success: false,
+        error: {
+          message: 'Email already registered.',
+        },
+      });
+    }
+
+    // Create organization first
+    const organization = await Organization.create({
+      name: organization_name,
+      type: organization_type || 'HOTEL',
+      country: country || 'TR',
+      timezone: timezone || 'Europe/Istanbul',
+      currency: currency || 'EUR',
+      is_active: true,
+    });
+
+    // Create admin user for this organization
     const user = await User.create({
-      organization_id,
+      organization_id: organization._id,
       email,
       password, // Will be hashed by the model
       first_name,
       last_name,
-      role: role || 'staff',
+      role: 'admin', // First user is always admin
       phone,
     });
 
     // Log action (non-fatal)
-    await require('../services/audit.service').logAction({
-      action: 'CREATE',
-      entity_type: 'user',
-      entity_id: user._id,
-      description: 'User registered',
-    }, { _id: user._id, organization_id, ip: req.ip, user_agent: req.headers['user-agent'] });
+    try {
+      await require('../services/audit.service').logAction({
+        action: 'CREATE',
+        entity_type: 'organization',
+        entity_id: organization._id,
+        description: 'Organization and admin user registered',
+      }, { _id: user._id, organization_id: organization._id, ip: req.ip, user_agent: req.headers['user-agent'] });
+    } catch (auditError) {
+      console.error('Audit log error:', auditError);
+    }
 
     // Generate tokens
     const tokens = generateTokens(user);
@@ -105,9 +104,10 @@ const register = async (req, res) => {
       success: true,
       data: {
         user: userResponse,
+        organization: organization.toObject(),
         ...tokens,
       },
-      message: 'User registered successfully',
+      message: 'Registration successful',
     });
   } catch (error) {
     console.error('Register error:', error);

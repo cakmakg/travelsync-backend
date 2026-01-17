@@ -1,17 +1,19 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useAppDispatch, useAppSelector } from '@/hooks/redux';
 import { fetchReservations } from '@/store/slices/reservationsSlice';
 import Card from '@/components/common/Card';
 import Button from '@/components/common/Button';
 import { CalendarDays, Plus, User } from 'lucide-react';
 import { formatDate, formatCurrency } from '@/utils/formatters';
+import ReservationModal from './ReservationModal';
 
 export default function ReservationsPage() {
   const dispatch = useAppDispatch();
   const { reservations, loading } = useAppSelector((state) => state.reservations);
+  const [showModal, setShowModal] = useState(false);
 
   useEffect(() => {
-    dispatch(fetchReservations());
+    dispatch(fetchReservations({}));
   }, [dispatch]);
 
   if (loading) {
@@ -49,7 +51,7 @@ export default function ReservationsPage() {
           <h1 className="text-3xl font-bold text-gray-900">Reservations</h1>
           <p className="text-gray-600 mt-2">Manage your bookings</p>
         </div>
-        <Button variant="primary" className="flex items-center space-x-2">
+        <Button variant="primary" className="flex items-center space-x-2" onClick={() => setShowModal(true)}>
           <Plus className="w-5 h-5" />
           <span>New Reservation</span>
         </Button>
@@ -61,7 +63,7 @@ export default function ReservationsPage() {
             <CalendarDays className="w-16 h-16 text-gray-400 mx-auto mb-4" />
             <h3 className="text-lg font-semibold text-gray-900 mb-2">No reservations yet</h3>
             <p className="text-gray-600 mb-6">Start by creating your first reservation</p>
-            <Button variant="primary" className="inline-flex items-center space-x-2">
+            <Button variant="primary" className="inline-flex items-center space-x-2" onClick={() => setShowModal(true)}>
               <Plus className="w-5 h-5" />
               <span>New Reservation</span>
             </Button>
@@ -143,6 +145,12 @@ export default function ReservationsPage() {
           </div>
         </Card>
       )}
+
+      {/* Reservation Modal */}
+      <ReservationModal
+        isOpen={showModal}
+        onClose={() => setShowModal(false)}
+      />
     </div>
   );
 }

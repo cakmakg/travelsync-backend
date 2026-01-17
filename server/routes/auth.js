@@ -7,13 +7,15 @@ const express = require('express');
 const router = express.Router();
 const authController = require('../controllers/auth');
 const { authenticate } = require('../middlewares/auth');
+const { passwordValidationMiddleware } = require('../middlewares/security');
 
 /**
  * @route   POST /api/v1/auth/register
  * @desc    Register new user
  * @access  Public
+ * @security Password validation (min 8 chars, uppercase, lowercase, number, special char)
  */
-router.post('/register', authController.register);
+router.post('/register', passwordValidationMiddleware, authController.register);
 
 /**
  * @route   POST /api/v1/auth/login

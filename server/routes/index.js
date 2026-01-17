@@ -17,7 +17,8 @@ module.exports = {
   reservation: require('./reservation'),
   agency: require('./agency'),
   agencyContract: require('./agencyContract'),
-  
+  admin: require('./admin'),
+
   // B2C Routes (Skeleton - Ready for future implementation)
   traveler: require('./traveler'),
   trip: require('./trip'),

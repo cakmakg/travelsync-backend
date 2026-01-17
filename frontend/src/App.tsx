@@ -14,6 +14,22 @@ import PropertiesPage from './pages/properties/PropertiesPage';
 import ReservationsPage from './pages/reservations/ReservationsPage';
 import RoomTypesPage from './pages/room-types/RoomTypesPage';
 
+// Hotel Pages
+import PricingPage from './pages/pricing/PricingPage';
+import AgenciesPage from './pages/agencies/AgenciesPage';
+import AnalyticsPage from './pages/analytics/AnalyticsPage';
+import SettingsPage from './pages/settings/SettingsPage';
+
+// Agency Pages
+import FlashOffersPage from './pages/agency/FlashOffersPage';
+import ContractsPage from './pages/agency/ContractsPage';
+
+// Admin Pages
+import AdminDashboard from './pages/admin/AdminDashboard';
+import OrganizationsPage from './pages/admin/OrganizationsPage';
+import UsersManagementPage from './pages/admin/UsersManagementPage';
+
+
 function App() {
   return (
     <Provider store={store}>
@@ -64,15 +80,52 @@ function App() {
             }
           />
 
-          {/* Placeholder routes */}
+          {/* Agency Routes */}
+          <Route
+            path="/flash-offers"
+            element={
+              <MainLayout>
+                <FlashOffersPage />
+              </MainLayout>
+            }
+          />
+          <Route
+            path="/contracts"
+            element={
+              <MainLayout>
+                <ContractsPage />
+              </MainLayout>
+            }
+          />
+          <Route
+            path="/hotels"
+            element={
+              <MainLayout>
+                <div className="text-center py-12">
+                  <h2 className="text-2xl font-bold text-gray-900">Browse Hotels</h2>
+                  <p className="text-gray-600 mt-2">Coming soon...</p>
+                </div>
+              </MainLayout>
+            }
+          />
+          <Route
+            path="/commission"
+            element={
+              <MainLayout>
+                <div className="text-center py-12">
+                  <h2 className="text-2xl font-bold text-gray-900">Commission Reports</h2>
+                  <p className="text-gray-600 mt-2">Coming soon...</p>
+                </div>
+              </MainLayout>
+            }
+          />
+
+          {/* Hotel Pages */}
           <Route
             path="/pricing"
             element={
               <MainLayout>
-                <div className="text-center py-12">
-                  <h2 className="text-2xl font-bold text-gray-900">Pricing</h2>
-                  <p className="text-gray-600 mt-2">Coming soon...</p>
-                </div>
+                <PricingPage />
               </MainLayout>
             }
           />
@@ -80,10 +133,7 @@ function App() {
             path="/agencies"
             element={
               <MainLayout>
-                <div className="text-center py-12">
-                  <h2 className="text-2xl font-bold text-gray-900">Agencies</h2>
-                  <p className="text-gray-600 mt-2">Coming soon...</p>
-                </div>
+                <AgenciesPage />
               </MainLayout>
             }
           />
@@ -91,10 +141,7 @@ function App() {
             path="/analytics"
             element={
               <MainLayout>
-                <div className="text-center py-12">
-                  <h2 className="text-2xl font-bold text-gray-900">Analytics</h2>
-                  <p className="text-gray-600 mt-2">Coming soon...</p>
-                </div>
+                <AnalyticsPage />
               </MainLayout>
             }
           />
@@ -102,10 +149,41 @@ function App() {
             path="/settings"
             element={
               <MainLayout>
-                <div className="text-center py-12">
-                  <h2 className="text-2xl font-bold text-gray-900">Settings</h2>
-                  <p className="text-gray-600 mt-2">Coming soon...</p>
-                </div>
+                <SettingsPage />
+              </MainLayout>
+            }
+          />
+
+          {/* Admin Routes */}
+          <Route
+            path="/admin"
+            element={
+              <MainLayout>
+                <AdminDashboard />
+              </MainLayout>
+            }
+          />
+          <Route
+            path="/admin/dashboard"
+            element={
+              <MainLayout>
+                <AdminDashboard />
+              </MainLayout>
+            }
+          />
+          <Route
+            path="/admin/organizations"
+            element={
+              <MainLayout>
+                <OrganizationsPage />
+              </MainLayout>
+            }
+          />
+          <Route
+            path="/admin/users"
+            element={
+              <MainLayout>
+                <UsersManagementPage />
               </MainLayout>
             }
           />

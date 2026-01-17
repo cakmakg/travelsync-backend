@@ -39,6 +39,21 @@ export const fetchReservations = createAsyncThunk(
   }
 );
 
+export const createReservation = createAsyncThunk(
+  'reservations/create',
+  async (data: Record<string, any>, { rejectWithValue }) => {
+    try {
+      const response = await reservationService.create(data);
+      if (response.success) {
+        return response.data;
+      }
+      return rejectWithValue('Failed to create reservation');
+    } catch (error: any) {
+      return rejectWithValue(getErrorMessage(error));
+    }
+  }
+);
+
 const reservationsSlice = createSlice({
   name: 'reservations',
   initialState,
@@ -59,6 +74,15 @@ const reservationsSlice = createSlice({
     });
     builder.addCase(fetchReservations.rejected, (state, action) => {
       state.loading = false;
+      state.error = action.payload as string;
+    });
+    // Create reservation
+    builder.addCase(createReservation.fulfilled, (state, action) => {
+      if (action.payload) {
+        state.reservations.unshift(action.payload);
+      }
+    });
+    builder.addCase(createReservation.rejected, (state, action) => {
       state.error = action.payload as string;
     });
   },
