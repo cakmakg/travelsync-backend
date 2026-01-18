@@ -4,6 +4,9 @@
  * Handles database connection and server startup
  */
 
+// Override console in production FIRST (before any other requires)
+require('./utils/consoleOverride');
+
 const dotenv = require('dotenv');
 dotenv.config();
 

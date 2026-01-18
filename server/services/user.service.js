@@ -6,6 +6,8 @@
 
 const bcrypt = require('bcrypt');
 const { User } = require('../models');
+const { validatePasswordStrength } = require('../utils/password');
+const logger = require('../config/logger');
 
 const VALID_ROLES = ['org_admin', 'property_manager', 'front_desk', 'staff'];
 
@@ -13,10 +15,33 @@ const VALID_ROLES = ['org_admin', 'property_manager', 'front_desk', 'staff'];
  * Create user (validations + audit log)
  */
 exports.createUser = async (data, actor) => {
-  // Basic validations
+  // Validate password strength (REQUIRED)
   if (!data.password) {
     const err = new Error('Password is required');
     err.statusCode = 400;
+    throw err;
+  }
+
+  const passwordValidation = validatePasswordStrength(data.password, {
+    minLength: 12,
+    requireUpperCase: true,
+    requireLowerCase: true,
+    requireNumbers: true,
+    requireSpecialChars: true,
+    preventCommonPatterns: true,
+    checkAgainstEmail: data.email,
+    checkCommonPasswords: true,
+  });
+
+  if (!passwordValidation.valid) {
+    const err = new Error(`Password does not meet security requirements: ${passwordValidation.errors.join('; ')}`);
+    err.statusCode = 400;
+    err.details = passwordValidation.errors;
+    logger.warn('[User Service] Weak password attempt during user creation:', {
+      email: data.email,
+      errors: passwordValidation.errors,
+      strength: passwordValidation.strength,
+    });
     throw err;
   }
 
@@ -69,6 +94,7 @@ exports.updatePassword = async (id, current_password, new_password, actor) => {
     throw err;
   }
 
+  // Find user first to get email
   const user = await User.findOne({ _id: id, organization_id: actor.organization_id, deleted_at: null }).select('+password');
   if (!user) {
     const err = new Error('User not found');
@@ -76,21 +102,75 @@ exports.updatePassword = async (id, current_password, new_password, actor) => {
     throw err;
   }
 
+  // Validate current password
   const isValid = await bcrypt.compare(current_password, user.password);
   if (!isValid) {
     const err = new Error('Current password is incorrect');
     err.statusCode = 401;
+    logger.warn('[User Service] Invalid current password attempt:', {
+      userId: id,
+      actorId: actor._id,
+    });
+    throw err;
+  }
+
+  // Validate new password strength
+  const passwordValidation = validatePasswordStrength(new_password, {
+    minLength: 12,
+    requireUpperCase: true,
+    requireLowerCase: true,
+    requireNumbers: true,
+    requireSpecialChars: true,
+    preventCommonPatterns: true,
+    checkAgainstEmail: user.email,
+    checkCommonPasswords: true,
+  });
+
+  if (!passwordValidation.valid) {
+    const err = new Error(`New password does not meet security requirements: ${passwordValidation.errors.join('; ')}`);
+    err.statusCode = 400;
+    err.details = passwordValidation.errors;
+    logger.warn('[User Service] Weak password attempt during password change:', {
+      userId: id,
+      errors: passwordValidation.errors,
+      strength: passwordValidation.strength,
+    });
+    throw err;
+  }
+
+  // Prevent reusing current password
+  const isSameAsCurrentPassword = await bcrypt.compare(new_password, user.password);
+  if (isSameAsCurrentPassword) {
+    const err = new Error('New password cannot be the same as current password');
+    err.statusCode = 400;
+    logger.warn('[User Service] Same password reuse attempt:', {
+      userId: id,
+      actorId: actor._id,
+    });
     throw err;
   }
 
   user.password = new_password;
   await user.save();
 
+  // Revoke all existing tokens for security
+  try {
+    const tokenService = require('./token.service');
+    const logger = require('../config/logger');
+    await tokenService.revokeUserTokens(user._id, 'password_changed', {
+      notes: 'User password was changed'
+    });
+  } catch (tokenError) {
+    const logger = require('../config/logger');
+    logger.warn('Error revoking tokens after password change:', tokenError);
+    // Log but don't block password change
+  }
+
   await require('./audit.service').logAction({
     action: 'UPDATE',
     entity_type: 'user',
     entity_id: user._id,
-    description: 'Password updated',
+    description: 'Password updated - all tokens revoked',
   }, actor);
 
   return true;

@@ -22,5 +22,10 @@ router.patch('/organizations/:id/status', adminController.updateOrganizationStat
 // Users
 router.get('/users', adminController.getUsers);
 router.patch('/users/:id/status', adminController.updateUserStatus);
+router.post('/users/:id/revoke-tokens', adminController.revokeUserTokens);
+router.get('/users/:id/token-stats', adminController.getUserTokenStats);
+
+// Token Management
+router.post('/tokens/cleanup', adminController.cleanupTokenBlacklist);
 
 module.exports = router;

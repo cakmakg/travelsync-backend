@@ -74,6 +74,34 @@ const verifyRefreshToken = (token) => {
 };
 
 /**
+ * Verify Refresh Token (with blacklist check)
+ * Checks both JWT validity AND blacklist status
+ * @param {String} token - JWT token to verify
+ * @returns {Object} Decoded payload
+ */
+const verifyRefreshTokenWithBlacklist = async (token) => {
+  const secret = process.env.JWT_REFRESH_SECRET;
+
+  if (!secret) {
+    throw new Error('JWT_REFRESH_SECRET is not defined in environment variables');
+  }
+
+  // First, check if token is blacklisted
+  const { isTokenBlacklisted } = require('../services/token.service');
+  const blacklisted = await isTokenBlacklisted(token);
+
+  if (blacklisted) {
+    const error = new Error('Token has been revoked');
+    error.name = 'TokenBlacklistError';
+    error.statusCode = 401;
+    throw error;
+  }
+
+  // Then verify JWT signature and expiry
+  return jwt.verify(token, secret);
+};
+
+/**
  * Generate both tokens
  * @param {Object} user - User object
  * @returns {Object} { access_token, refresh_token }
@@ -97,5 +125,6 @@ module.exports = {
   generateRefreshToken,
   verifyAccessToken,
   verifyRefreshToken,
+  verifyRefreshTokenWithBlacklist,
   generateTokens,
 };

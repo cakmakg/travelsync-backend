@@ -4,7 +4,10 @@
  * DRY (Don't Repeat Yourself) prensibiyle oluşturulmuş base controller.
  * Tüm CRUD işlemlerini tek yerden yönetir.
  * 
- * Her controller bu base'i extend ederek kullanır.
+ * MULTI-TENANT SECURITY:
+ * - Organization filter ALWAYS applied (no opt-out)
+ * - User can only access their organization's data
+ * - All operations tied to req.user.organization_id
  * 
  * Uses:
  * - Response helper (res.success(), res.error(), etc.)
@@ -12,22 +15,48 @@
  */
 
 const asyncHandler = require('../middlewares/asyncHandler');
+const logger = require('../config/logger');
 
 class BaseController {
   /**
    * Constructor
    * @param {mongoose.Model} model - Mongoose model
    * @param {string} modelName - Model adı (audit log için)
+   * @param {boolean} requiresOrgFilter - Organization filter required (default: true)
    */
-  constructor(model, modelName) {
+  constructor(model, modelName, requiresOrgFilter = true) {
     this.model = model;
     this.modelName = modelName;
+    // Organization filter is REQUIRED by default (cannot be disabled)
+    this.requiresOrgFilter = requiresOrgFilter;
+    // Legacy support for useOrganizationFilter flag - always enabled
+    this.useOrganizationFilter = true;
+  }
+
+  /**
+   * Validate user has organization context
+   * @private
+   */
+  _validateOrganizationContext(req) {
+    if (!req.user?.organization_id) {
+      const error = new Error('Organization context missing');
+      error.statusCode = 403;
+      logger.error('[BaseController] Missing organization context:', {
+        userId: req.user?._id,
+        userRole: req.user?.role,
+      });
+      throw error;
+    }
   }
 
   /**
    * GET ALL - List all resources with pagination, search, filter
+   * ALWAYS filters by organization_id
    */
   getAll = asyncHandler(async (req, res) => {
+    // Validate organization context (required)
+    this._validateOrganizationContext(req);
+
     const {
       page = 1,
       limit = 10,
@@ -39,10 +68,8 @@ class BaseController {
     // Build query
     const query = {};
 
-    // Organization filter (multi-tenant) - optional
-    if (this.useOrganizationFilter && req.user?.organization_id) {
-      query.organization_id = req.user.organization_id;
-    }
+    // MANDATORY Organization filter - cannot be bypassed
+    query.organization_id = req.user.organization_id;
 
     // Search (override in child if needed)
     if (search && this.searchFields) {
@@ -51,9 +78,10 @@ class BaseController {
       }));
     }
 
-    // Additional filters
+    // Additional filters - but organization_id is immutable
     Object.keys(filters).forEach(key => {
-      if (filters[key]) {
+      // Never allow organization_id override
+      if (key !== 'organization_id' && filters[key]) {
         query[key] = filters[key];
       }
     });
@@ -90,19 +118,20 @@ class BaseController {
 
   /**
    *  GET BY ID - Get single resource
+   * ALWAYS validates organization ownership
    */
   getById = asyncHandler(async (req, res) => {
+    // Validate organization context (required)
+    this._validateOrganizationContext(req);
+
     const { id } = req.params;
 
     const query = {
       _id: id,
-      deleted_at: null
+      deleted_at: null,
+      // MANDATORY organization filter
+      organization_id: req.user.organization_id
     };
-
-    // Organization filter (multi-tenant) - optional
-    if (this.useOrganizationFilter && req.user?.organization_id) {
-      query.organization_id = req.user.organization_id;
-    }
 
     const item = await this.model
       .findOne(query)
@@ -117,12 +146,25 @@ class BaseController {
 
   /**
    * ➕ CREATE - Create new resource
+   * ALWAYS ties resource to user's organization
    */
   create = asyncHandler(async (req, res) => {
-    // Add organization_id from authenticated user
+    // Validate organization context (required)
+    this._validateOrganizationContext(req);
+
+    // Validate user is not trying to create for another organization
+    if (req.body.organization_id && 
+        req.body.organization_id !== req.user.organization_id.toString()) {
+      return res.status(403).json({
+        success: false,
+        error: { message: 'Cannot create resources for other organizations' },
+      });
+    }
+
+    // MANDATORY: Set organization_id from authenticated user
     const data = {
       ...req.body,
-      organization_id: req.user?.organization_id
+      organization_id: req.user.organization_id
     };
 
     // Custom validation (override in child if needed)
@@ -150,25 +192,30 @@ class BaseController {
 
   /**
    *  UPDATE - Update existing resource
+   * ALWAYS validates organization ownership before update
    */
   update = asyncHandler(async (req, res) => {
+    // Validate organization context (required)
+    this._validateOrganizationContext(req);
+
     const { id } = req.params;
 
-    // Find existing resource
+    // Find existing resource - MANDATORY organization filter
     const query = {
       _id: id,
-      deleted_at: null
+      deleted_at: null,
+      organization_id: req.user.organization_id
     };
-
-    // Organization filter (multi-tenant) - optional
-    if (this.useOrganizationFilter && req.user?.organization_id) {
-      query.organization_id = req.user.organization_id;
-    }
 
     const existing = await this.model.findOne(query);
 
     if (!existing) {
       return res.notFound(`${this.modelName} not found`);
+    }
+
+    // Prevent organization_id change
+    if (req.body.organization_id) {
+      delete req.body.organization_id;
     }
 
     // Store before state
@@ -200,20 +247,20 @@ class BaseController {
 
   /**
    * 🗑️ DELETE - Soft delete resource
+   * ALWAYS validates organization ownership before delete
    */
   delete = asyncHandler(async (req, res) => {
+    // Validate organization context (required)
+    this._validateOrganizationContext(req);
+
     const { id } = req.params;
 
-    // Find existing resource
+    // Find existing resource - MANDATORY organization filter
     const query = {
       _id: id,
-      deleted_at: null
+      deleted_at: null,
+      organization_id: req.user.organization_id
     };
-
-    // Organization filter (multi-tenant) - optional
-    if (this.useOrganizationFilter && req.user?.organization_id) {
-      query.organization_id = req.user.organization_id;
-    }
 
     const existing = await this.model.findOne(query);
 
@@ -226,6 +273,7 @@ class BaseController {
 
     // Soft delete
     existing.deleted_at = new Date();
+    existing.deleted_by = req.user._id;
     await existing.save();
 
     // Audit log
@@ -242,16 +290,19 @@ class BaseController {
 
   /**
    * 🔄 RESTORE - Restore soft deleted resource
+   * ALWAYS validates organization ownership before restore
    */
   restore = asyncHandler(async (req, res) => {
+    // Validate organization context (required)
+    this._validateOrganizationContext(req);
+
     const { id } = req.params;
 
-    const query = { _id: id };
-
-    // Organization filter (multi-tenant) - optional
-    if (this.useOrganizationFilter && req.user?.organization_id) {
-      query.organization_id = req.user.organization_id;
-    }
+    // MANDATORY organization filter
+    const query = { 
+      _id: id,
+      organization_id: req.user.organization_id
+    };
 
     const existing = await this.model.findOne(query);
 
@@ -264,7 +315,10 @@ class BaseController {
     }
 
     // Restore
+    const before = existing.toObject();
     existing.deleted_at = null;
+    existing.restored_by = req.user._id;
+    existing.restored_at = new Date();
     await existing.save();
 
     // Audit log
@@ -272,6 +326,7 @@ class BaseController {
       action: 'RESTORE',
       entity_type: this.modelName,
       entity_id: existing._id,
+      changes: { before, after: existing.toObject() },
       description: `${this.modelName} restored`,
     }, { _id: req.user?._id, organization_id: req.user?.organization_id, ip: req.ip, user_agent: req.headers['user-agent'] });
 

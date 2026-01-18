@@ -5,6 +5,7 @@
 ------------------------------------------------------- */
 
 const { User, Organization } = require('../models');
+const tokenService = require('../services/token.service');
 
 /**
  * @desc    Get all organizations (hotels and agencies)
@@ -302,10 +303,128 @@ const updateUserStatus = async (req, res) => {
     }
 };
 
+/**
+ * @desc    Cleanup expired token blacklist entries
+ * @route   POST /api/v1/admin/tokens/cleanup
+ * @access  Super Admin
+ */
+const cleanupTokenBlacklist = async (req, res) => {
+    try {
+        const result = await tokenService.cleanupExpiredBlacklist();
+
+        return res.json({
+            success: true,
+            data: {
+                deleted_count: result.deletedCount,
+                acknowledged: result.acknowledged,
+            },
+            message: `Cleaned up ${result.deletedCount} expired blacklist entries`,
+        });
+    } catch (error) {
+        console.error('Cleanup token blacklist error:', error);
+
+        return res.status(500).json({
+            success: false,
+            error: { message: 'Failed to cleanup token blacklist' },
+        });
+    }
+};
+
+/**
+ * @desc    Revoke all tokens for a user (security incident)
+ * @route   POST /api/v1/admin/users/:id/revoke-tokens
+ * @access  Super Admin
+ */
+const revokeUserTokens = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { reason = 'admin_revoke', notes } = req.body;
+
+        // Verify user exists
+        const user = await User.findById(id);
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                error: { message: 'User not found' },
+            });
+        }
+
+        // Revoke tokens
+        const result = await tokenService.revokeUserTokens(id, reason, { notes });
+
+        // Log audit action
+        try {
+            await require('../services/audit.service').logAction({
+                action: 'REVOKE_TOKENS',
+                entity_type: 'user',
+                entity_id: id,
+                description: `All tokens revoked - Reason: ${reason}`,
+            }, { _id: req.user?._id, organization_id: req.user?.organization_id, ip: req.ip, user_agent: req.headers['user-agent'] });
+        } catch (auditError) {
+            console.error('Audit log error:', auditError);
+        }
+
+        return res.json({
+            success: true,
+            data: result,
+            message: `Revoked ${result.revoked_count} active tokens for user ${user.email}`,
+        });
+    } catch (error) {
+        console.error('Revoke user tokens error:', error);
+
+        return res.status(500).json({
+            success: false,
+            error: { message: 'Failed to revoke user tokens' },
+        });
+    }
+};
+
+/**
+ * @desc    Get token blacklist statistics for a user
+ * @route   GET /api/v1/admin/users/:id/token-stats
+ * @access  Super Admin
+ */
+const getUserTokenStats = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        // Verify user exists
+        const user = await User.findById(id);
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                error: { message: 'User not found' },
+            });
+        }
+
+        // Get stats
+        const stats = await tokenService.getUserTokenStats(id);
+
+        return res.json({
+            success: true,
+            data: {
+                user_id: id,
+                user_email: user.email,
+                token_revocation_stats: stats,
+            },
+        });
+    } catch (error) {
+        console.error('Get user token stats error:', error);
+
+        return res.status(500).json({
+            success: false,
+            error: { message: 'Failed to get token statistics' },
+        });
+    }
+};
+
 module.exports = {
     getOrganizations,
     getUsers,
     getStats,
     updateOrganizationStatus,
     updateUserStatus,
+    cleanupTokenBlacklist,
+    revokeUserTokens,
+    getUserTokenStats,
 };

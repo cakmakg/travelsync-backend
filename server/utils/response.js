@@ -4,6 +4,9 @@
     Standardized response formatting for all API endpoints
 ------------------------------------------------------- */
 
+const { sanitizeError, sanitizeLogData } = require('./errorSanitizer');
+const isDevelopment = process.env.NODE_ENV !== 'production';
+
 /**
  * Standardized success response
  * @param {Object} res - Express response object
@@ -37,25 +40,34 @@ const success = (res, data = null, options = {}, statusCode = 200) => {
 
 /**
  * Standardized error response
+ * Sanitizes error messages to prevent information disclosure
  * @param {Object} res - Express response object
  * @param {String|Object} error - Error message or error object
  * @param {Number} statusCode - HTTP status code (default: 500)
- * @param {Object} details - Additional error details
+ * @param {Object} details - Additional error details (sanitized)
  */
 const error = (res, error, statusCode = 500, details = null) => {
+  // Handle error object vs string
+  const errorObj = typeof error === 'string' ? { message: error } : error;
+  
+  // Sanitize error message
+  const sanitized = sanitizeError(errorObj, isDevelopment);
+  
   const response = {
     success: false,
     error: {
-      message: typeof error === 'string' ? error : error.message || 'Internal Server Error',
+      message: sanitized.message,
     },
   };
 
+  // Sanitize and include details if provided
   if (details) {
-    response.error.details = details;
+    response.error.details = sanitizeLogData(details);
   }
 
-  if (process.env.NODE_ENV !== 'production' && error.stack) {
-    response.error.stack = error.stack;
+  // Include stack trace only in development
+  if (isDevelopment && errorObj.stack) {
+    response.error.stack = errorObj.stack;
   }
 
   return res.status(statusCode).json(response);

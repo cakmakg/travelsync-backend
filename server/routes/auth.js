@@ -8,6 +8,7 @@ const router = express.Router();
 const authController = require('../controllers/auth');
 const { authenticate } = require('../middlewares/auth');
 const { passwordValidationMiddleware } = require('../middlewares/security');
+const { validateRefreshTokenNotBlacklisted } = require('../middlewares/tokenValidation');
 
 /**
  * @route   POST /api/v1/auth/register
@@ -35,8 +36,9 @@ router.get('/me', authenticate, authController.getProfile);
  * @route   POST /api/v1/auth/refresh
  * @desc    Refresh access token
  * @access  Public
+ * @security Token blacklist check
  */
-router.post('/refresh', authController.refreshToken);
+router.post('/refresh', validateRefreshTokenNotBlacklisted, authController.refreshToken);
 
 /**
  * @route   POST /api/v1/auth/logout

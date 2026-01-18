@@ -22,4 +22,5 @@ module.exports = {
   Payment: require('./Payment'),
   Review: require('./Review'),
   Wishlist: require('./Wishlist'),
+  TokenBlacklist: require('./TokenBlacklist'),
 };

@@ -4,8 +4,11 @@
 ------------------------------------------------------- */
 
 const bcrypt = require('bcrypt');
+const logger = require('../config/logger');
 const { User, Organization, AuditLog } = require('../models');
-const { generateTokens, verifyRefreshToken } = require('../utils/jwt');
+const { generateTokens, verifyRefreshTokenWithBlacklist } = require('../utils/jwt');
+const { validatePasswordStrength } = require('../utils/password');
+const tokenService = require('../services/token.service');
 
 /**
  * Register new user with organization (single-step registration)
@@ -39,12 +42,25 @@ const register = async (req, res) => {
       });
     }
 
-    // Check password strength
-    if (password.length < 8) {
+    // Validate password strength (OWASP compliant)
+    const passwordValidation = validatePasswordStrength(password, {
+      minLength: 12,
+      requireUpperCase: true,
+      requireLowerCase: true,
+      requireNumbers: true,
+      requireSpecialChars: true,
+      preventCommonPatterns: true,
+      checkAgainstEmail: email,
+      checkCommonPasswords: true,
+    });
+
+    if (!passwordValidation.valid) {
       return res.status(400).json({
         success: false,
         error: {
-          message: 'Password must be at least 8 characters long.',
+          message: 'Password does not meet security requirements',
+          details: passwordValidation.errors,
+          strength: passwordValidation.strength,
         },
       });
     }
@@ -90,7 +106,7 @@ const register = async (req, res) => {
         description: 'Organization and admin user registered',
       }, { _id: user._id, organization_id: organization._id, ip: req.ip, user_agent: req.headers['user-agent'] });
     } catch (auditError) {
-      console.error('Audit log error:', auditError);
+      logger.warn('Audit log error:', auditError);
     }
 
     // Generate tokens
@@ -110,7 +126,7 @@ const register = async (req, res) => {
       message: 'Registration successful',
     });
   } catch (error) {
-    console.error('Register error:', error);
+    logger.error('Register error:', error);
 
     if (error.name === 'ValidationError') {
       return res.status(400).json({
@@ -213,7 +229,7 @@ const login = async (req, res) => {
       message: 'Login successful',
     });
   } catch (error) {
-    console.error('Login error:', error);
+    logger.error('Login error:', error);
 
     res.status(500).json({
       success: false,
@@ -250,7 +266,7 @@ const getProfile = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('Get profile error:', error);
+    logger.error('Get profile error:', error);
 
     res.status(500).json({
       success: false,
@@ -278,8 +294,21 @@ const refreshToken = async (req, res) => {
       });
     }
 
-    // Verify refresh token
-    const decoded = verifyRefreshToken(refresh_token);
+    // Verify refresh token (checks blacklist + JWT validity)
+    let decoded;
+    try {
+      decoded = await verifyRefreshTokenWithBlacklist(refresh_token);
+    } catch (error) {
+      if (error.name === 'TokenBlacklistError') {
+        return res.status(401).json({
+          success: false,
+          error: {
+            message: 'Token has been revoked. Please login again.',
+          },
+        });
+      }
+      throw error;
+    }
 
     // Get user
     const user = await User.findById(decoded._id);
@@ -304,7 +333,7 @@ const refreshToken = async (req, res) => {
       message: 'Token refreshed successfully',
     });
   } catch (error) {
-    console.error('Refresh token error:', error);
+    logger.error('Refresh token error:', error);
 
     if (error.name === 'JsonWebTokenError' || error.name === 'TokenExpiredError') {
       return res.status(401).json({
@@ -327,27 +356,52 @@ const refreshToken = async (req, res) => {
 /**
  * Logout user
  * POST /auth/logout
+ * Blacklists the refresh token
  */
 const logout = async (req, res) => {
   try {
-    // Log action
-    await AuditLog.logAction({
-      organization_id: req.user.organization_id,
-      user_id: req.user._id,
-      action: 'LOGOUT',
-      entity_type: 'user',
-      entity_id: req.user._id,
-      description: 'User logged out',
-      ip_address: req.ip,
-      user_agent: req.headers['user-agent'],
-    });
+    const { refresh_token } = req.body;
+    const user = req.user;
+
+    // Log audit action first
+    try {
+      await require('../services/audit.service').logAction({
+        action: 'LOGOUT',
+        entity_type: 'user',
+        entity_id: user._id,
+        description: 'User logged out',
+      }, { _id: user._id, organization_id: user.organization_id, ip: req.ip, user_agent: req.headers['user-agent'] });
+    } catch (auditError) {
+      logger.warn('Audit log error during logout:', auditError);
+      // Continue with logout even if audit fails
+    }
+
+    // If refresh token provided, add to blacklist
+    if (refresh_token) {
+      try {
+        await tokenService.blacklistRefreshToken(
+          refresh_token,
+          user._id,
+          {
+            organization_id: user.organization_id,
+            reason: 'logout',
+            ip: req.ip,
+            user_agent: req.headers['user-agent'],
+            notes: 'User initiated logout',
+          }
+        );
+      } catch (blacklistError) {
+        logger.warn('Error blacklisting token during logout:', blacklistError);
+        // Log but continue - client should handle token as invalid anyway
+      }
+    }
 
     res.status(200).json({
       success: true,
       message: 'Logout successful',
     });
   } catch (error) {
-    console.error('Logout error:', error);
+    logger.error('Logout error:', error);
 
     res.status(500).json({
       success: false,
