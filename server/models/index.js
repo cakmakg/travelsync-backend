@@ -16,6 +16,8 @@ module.exports = {
   AuditLog: require('./Auditlog'),
   Agency: require('./Agency'),
   AgencyContract: require('./AgencyContract'),
+  HotelAgencyPartnership: require('./HotelAgencyPartnership'),
+  FlashOffer: require('./FlashOffer'),
   // B2C Models (Skeleton - Ready for future implementation)
   Traveler: require('./Traveler'),
   Trip: require('./Trip'),

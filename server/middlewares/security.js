@@ -231,6 +231,217 @@ const securityLogger = (eventType, details, req) => {
     });
 };
 
+/**
+ * Redis-backed Rate Limiting Factory
+ * Multi-instance deployment için Redis store kullanır
+ */
+const createRedisRateLimiter = (options = {}) => {
+    const rateLimit = require('express-rate-limit');
+    const { getRedisClient, isRedisConnected } = require('../config/redis');
+
+    const defaultOptions = {
+        windowMs: 15 * 60 * 1000, // 15 dakika
+        max: 100,
+        standardHeaders: true,
+        legacyHeaders: false,
+        message: {
+            success: false,
+            error: { message: 'Too many requests, please try again later.' }
+        },
+        skip: () => process.env.NODE_ENV !== 'production',
+    };
+
+    const mergedOptions = { ...defaultOptions, ...options };
+
+    // Redis bağlıysa Redis store kullan
+    if (isRedisConnected()) {
+        const RedisStore = require('rate-limit-redis');
+        const redisClient = getRedisClient();
+
+        if (redisClient) {
+            mergedOptions.store = new RedisStore({
+                sendCommand: (...args) => redisClient.call(...args),
+                prefix: 'rl:',
+            });
+        }
+    }
+
+    return rateLimit(mergedOptions);
+};
+
+/**
+ * HTTPS Enforcement Middleware
+ * Production'da HTTPS'e yönlendirir
+ */
+const httpsEnforcement = (req, res, next) => {
+    // Production değilse devam et
+    if (process.env.NODE_ENV !== 'production') {
+        return next();
+    }
+
+    // Zaten HTTPS ise devam et
+    if (req.secure || req.headers['x-forwarded-proto'] === 'https') {
+        return next();
+    }
+
+    // HTTPS'e yönlendir
+    const httpsUrl = `https://${req.headers.host}${req.url}`;
+    return res.redirect(301, httpsUrl);
+};
+
+/**
+ * Gelişmiş Input Sanitization
+ * XSS, SQL Injection, NoSQL Injection'a karşı koruma
+ */
+const inputSanitizer = (req, res, next) => {
+    const validator = require('validator');
+
+    const sanitizeValue = (value) => {
+        if (typeof value === 'string') {
+            // HTML entities escape
+            let sanitized = validator.escape(value);
+            // Trim whitespace
+            sanitized = validator.trim(sanitized);
+            // Null bytes temizle
+            sanitized = sanitized.replace(/\0/g, '');
+            return sanitized;
+        }
+        return value;
+    };
+
+    const sanitizeObject = (obj) => {
+        if (!obj || typeof obj !== 'object') return obj;
+
+        const sanitized = {};
+        for (const [key, value] of Object.entries(obj)) {
+            // Key'leri de kontrol et (prototype pollution)
+            if (key === '__proto__' || key === 'constructor' || key === 'prototype') {
+                continue;
+            }
+
+            if (Array.isArray(value)) {
+                sanitized[key] = value.map(v =>
+                    typeof v === 'object' ? sanitizeObject(v) : sanitizeValue(v)
+                );
+            } else if (typeof value === 'object' && value !== null) {
+                sanitized[key] = sanitizeObject(value);
+            } else {
+                sanitized[key] = sanitizeValue(value);
+            }
+        }
+        return sanitized;
+    };
+
+    // Body, query ve params'ı sanitize et
+    if (req.body) req.body = sanitizeObject(req.body);
+    if (req.query) req.query = sanitizeObject(req.query);
+    if (req.params) req.params = sanitizeObject(req.params);
+
+    next();
+};
+
+/**
+ * API Key Validation Middleware
+ * Harici API erişimleri için API key kontrolü
+ */
+const apiKeyValidator = (req, res, next) => {
+    const apiKey = req.headers['x-api-key'];
+
+    // API key yoksa veya yanlışsa
+    if (!apiKey || apiKey !== process.env.API_KEY) {
+        // Bazı route'lar için API key zorunlu değil
+        if (req.path.startsWith('/api/v1/auth') ||
+            req.path.startsWith('/health') ||
+            req.path === '/') {
+            return next();
+        }
+
+        // API key tanımlı değilse (development) devam et
+        if (!process.env.API_KEY) {
+            return next();
+        }
+
+        securityLogger('INVALID_API_KEY', { providedKey: apiKey?.substring(0, 8) + '...' }, req);
+        return res.status(401).json({
+            success: false,
+            error: { message: 'Invalid or missing API key' }
+        });
+    }
+
+    next();
+};
+
+/**
+ * Brute Force Protection
+ * Login denemelerini sınırlar
+ */
+const bruteForceProtection = createRedisRateLimiter({
+    windowMs: 15 * 60 * 1000, // 15 dakika
+    max: 5, // 5 deneme
+    message: {
+        success: false,
+        error: {
+            message: 'Too many login attempts. Please try again after 15 minutes.',
+            retryAfter: 15 * 60
+        }
+    },
+    keyGenerator: (req) => {
+        // IP + username kombinasyonu
+        const username = req.body?.email || req.body?.username || '';
+        return `${req.ip}:${username}`;
+    },
+    skip: () => process.env.NODE_ENV !== 'production',
+});
+
+/**
+ * Sensitive Data Masking
+ * Log'larda hassas verileri maskeler
+ */
+const maskSensitiveData = (data) => {
+    if (!data || typeof data !== 'object') return data;
+
+    const sensitiveFields = [
+        'password', 'token', 'secret', 'apiKey', 'api_key',
+        'accessToken', 'refreshToken', 'credit_card', 'cvv',
+        'ssn', 'tax_id', 'bank_account'
+    ];
+
+    const masked = { ...data };
+
+    for (const field of sensitiveFields) {
+        if (masked[field]) {
+            masked[field] = '***MASKED***';
+        }
+    }
+
+    return masked;
+};
+
+/**
+ * Security Audit Middleware
+ * Güvenlik olaylarını loglar
+ */
+const securityAudit = (req, res, next) => {
+    const startTime = Date.now();
+
+    // Response tamamlandığında logla
+    res.on('finish', () => {
+        const duration = Date.now() - startTime;
+        const isError = res.statusCode >= 400;
+        const isSuspicious = res.statusCode === 401 || res.statusCode === 403;
+
+        if (isSuspicious) {
+            securityLogger('AUTH_FAILURE', {
+                statusCode: res.statusCode,
+                duration,
+                body: maskSensitiveData(req.body),
+            }, req);
+        }
+    });
+
+    next();
+};
+
 module.exports = {
     helmetConfig,
     securityHeaders,
@@ -242,4 +453,13 @@ module.exports = {
     uploadLimits,
     getCorsConfig,
     securityLogger,
+    // Yeni eklenenler
+    createRedisRateLimiter,
+    httpsEnforcement,
+    inputSanitizer,
+    apiKeyValidator,
+    bruteForceProtection,
+    maskSensitiveData,
+    securityAudit,
 };
+

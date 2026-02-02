@@ -21,6 +21,10 @@ const {
     securityHeaders,
     requestTimeout,
     ipSecurity,
+    httpsEnforcement,
+    inputSanitizer,
+    securityAudit,
+    bruteForceProtection,
 } = require('./middlewares/security');
 
 dotenv.config();
@@ -31,6 +35,9 @@ const app = express();
 // ============================================
 // ÜST SEVİYE GÜVENLİK MIDDLEWARE
 // ============================================
+
+// HTTPS Enforcement (Production'da HTTP -> HTTPS redirect)
+app.use(httpsEnforcement);
 
 // Gelişmiş Helmet konfigürasyonu (CSP, HSTS, XSS, etc.)
 app.use(helmet(helmetConfig));
@@ -43,6 +50,9 @@ app.use(requestTimeout(30000));
 
 // IP tabanlı güvenlik kontrolleri
 app.use(ipSecurity);
+
+// Security Audit - güvenlik olaylarını logla
+app.use(securityAudit);
 
 // Rate limiting - Genel API koruma (sadece production'da aktif)
 const limiter = rateLimit({
@@ -92,6 +102,9 @@ app.use(xss());
 app.use(hpp({
     whitelist: ['sort', 'page', 'limit', 'status'] // İzin verilen duplicate params
 }));
+
+// Gelişmiş Input Sanitization
+app.use(inputSanitizer);
 
 // Compression
 app.use(compression());
@@ -174,7 +187,9 @@ apiRouter.use('/inventory', require('./routes/inventory'));
 apiRouter.use('/reservations', require('./routes/reservation'));
 apiRouter.use('/agencies', require('./routes/agency'));
 apiRouter.use('/agency-contracts', require('./routes/agencyContract'));
+apiRouter.use('/packages', require('./routes/package.routes'));
 apiRouter.use('/admin', require('./routes/admin'));
+apiRouter.use('/partnerships', require('./routes/partnership'));
 
 // AI Routes
 apiRouter.use('/ai/pricing', require('./routes/ai/pricing.routes'));
@@ -182,6 +197,13 @@ apiRouter.use('/analytics', require('./routes/analytics'));
 
 // Flash Offer Routes (WhatsApp bildirimleri)
 apiRouter.use('/flash-offers', require('./routes/flashOffer'));
+apiRouter.use('/flash-offers-b2b', require('./routes/flashOfferB2B'));
+
+// PMS Integration Routes (Protel, SIHOT, etc.)
+apiRouter.use('/pms', require('./routes/pms.routes'));
+
+// Payment Routes (Stripe, Klarna)
+apiRouter.use('/payments', require('./routes/payment.routes'));
 
 app.use('/api/v1', apiRouter);
 

@@ -17,7 +17,7 @@ type LoginFormData = z.infer<typeof loginSchema>;
 
 export default function LoginPage() {
   const navigate = useNavigate();
-  const { login, isAuthenticated, loading, error } = useAuth();
+  const { login, isAuthenticated, loading, error, user } = useAuth();
 
   const {
     register,
@@ -27,16 +27,26 @@ export default function LoginPage() {
     resolver: zodResolver(loginSchema),
   });
 
-  useEffect(() => {
-    if (isAuthenticated) {
-      navigate('/dashboard');
+  // Redirect based on organization type
+  const getRedirectPath = (orgType: string | undefined) => {
+    if (orgType === 'AGENCY') {
+      return '/agency/dashboard';
     }
-  }, [isAuthenticated, navigate]);
+    return '/dashboard';
+  };
+
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      navigate(getRedirectPath(user.organization_type));
+    }
+  }, [isAuthenticated, user, navigate]);
 
   const onSubmit = async (data: LoginFormData) => {
     const result = await login(data);
     if (result.meta.requestStatus === 'fulfilled') {
-      navigate('/dashboard');
+      // Type assert the payload properly
+      const payload = result.payload as { user?: { organization_type?: string } } | undefined;
+      navigate(getRedirectPath(payload?.user?.organization_type));
     }
   };
 

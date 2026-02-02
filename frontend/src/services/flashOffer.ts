@@ -14,18 +14,14 @@ export interface FlashOfferData {
 
 export interface FlashOfferResult {
     offer: {
-        property_name: string;
-        room_count: number;
-        discount_percentage: number;
-        valid_from: string;
-        valid_to: string;
+        _id: string;
+        title: string;
+        property_name?: string;
+        discount_value: number;
+        discount_type: string;
+        rooms_available: number;
     };
-    notification_results: {
-        total_agencies: number;
-        sent: number;
-        failed: number;
-        skipped: number;
-    };
+    whatsapp_sent?: number;
 }
 
 export interface WhatsAppStatus {
@@ -46,7 +42,21 @@ export interface PriceSuggestion {
 export const flashOfferService = {
     // Flash Offer oluştur
     create: async (data: FlashOfferData) => {
-        const response = await api.post<{ success: boolean; data: FlashOfferResult }>('/flash-offers', data);
+        // Frontend alanlarını backend alanlarına dönüştür
+        const payload = {
+            property_id: data.property_id,
+            room_type_id: data.room_type_id,
+            rooms_available: data.room_count,
+            discount_type: 'percentage',
+            discount_value: data.discount_percentage,
+            stay_date_from: data.valid_from,
+            stay_date_to: data.valid_to,
+            hours_valid: data.hours_valid || 24,
+            target_type: data.target_agencies === 'all' ? 'all_partners' : 'specific_agencies',
+            target_agency_ids: Array.isArray(data.target_agencies) ? data.target_agencies : [],
+            description: data.message_note,
+        };
+        const response = await api.post<{ success: boolean; data: FlashOfferResult }>('/flash-offers', payload);
         return response.data;
     },
 

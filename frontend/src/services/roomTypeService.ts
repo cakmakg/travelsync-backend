@@ -6,10 +6,9 @@ export interface CreateRoomTypeData {
   name: string;
   code: string;
   description?: string;
-  max_occupancy: {
+  capacity: {
     adults: number;
     children: number;
-    infants: number;
   };
   bed_configuration: string;
   size_sqm?: number;
@@ -17,7 +16,7 @@ export interface CreateRoomTypeData {
   total_quantity: number;
 }
 
-export interface UpdateRoomTypeData extends Partial<CreateRoomTypeData> {}
+export interface UpdateRoomTypeData extends Partial<CreateRoomTypeData> { }
 
 export const roomTypeService = {
   // Get all room types

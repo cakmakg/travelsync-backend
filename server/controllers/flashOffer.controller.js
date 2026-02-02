@@ -5,7 +5,7 @@
 ------------------------------------------------------- */
 
 const asyncHandler = require('../middlewares/asyncHandler');
-const { Agency, Property, RoomType, Price } = require('../models');
+const { FlashOffer, Property, RoomType, Price, HotelAgencyPartnership } = require('../models');
 const whatsappService = require('../services/whatsapp.service');
 const { logAction } = require('../services/audit.service');
 
@@ -15,34 +15,44 @@ const { logAction } = require('../services/audit.service');
  */
 class FlashOfferController {
     /**
-     * Flash Offer Oluştur ve Gönder
+     * Flash Offer Oluştur ve Kaydet
      * POST /api/v1/flash-offers
      */
     create = asyncHandler(async (req, res) => {
         const {
             property_id,
             room_type_id,
-            room_count,
-            discount_percentage,
-            valid_from,
-            valid_to,
+            title,
+            description,
+            discount_type = 'percentage',
+            discount_value,
+            rooms_available,
+            original_price,
+            stay_date_from,
+            stay_date_to,
+            offer_expires_at,
             hours_valid = 24,
-            target_agencies = 'all', // 'all' veya agency ID array
-            message_note, // Opsiyonel ek mesaj
+            target_type = 'all_partners',
+            target_agency_ids = [],
+            send_whatsapp = false,
+            tags = [],
         } = req.body;
 
         // Validasyonlar
         if (!property_id) {
             return res.badRequest('Property ID gereklidir');
         }
-        if (!room_count || room_count < 1) {
+        if (!rooms_available || rooms_available < 1) {
             return res.badRequest('Oda sayısı en az 1 olmalıdır');
         }
-        if (!discount_percentage || discount_percentage < 1 || discount_percentage > 90) {
-            return res.badRequest('İndirim oranı 1-90 arasında olmalıdır');
+        if (!discount_value || discount_value < 1) {
+            return res.badRequest('İndirim değeri gereklidir');
         }
-        if (!valid_from || !valid_to) {
-            return res.badRequest('Geçerlilik tarihleri gereklidir');
+        if (discount_type === 'percentage' && discount_value > 90) {
+            return res.badRequest('İndirim oranı maksimum %90 olabilir');
+        }
+        if (!stay_date_from || !stay_date_to) {
+            return res.badRequest('Konaklama tarihleri gereklidir');
         }
 
         // Property bilgilerini al
@@ -65,76 +75,201 @@ class FlashOfferController {
             });
         }
 
-        // Hedef acenteleri belirle
-        let agencies;
-        if (target_agencies === 'all') {
-            // Tüm aktif acenteler
-            agencies = await Agency.find({
-                organization_id: req.user.organization_id,
-                is_active: true,
-                'whatsapp_settings.enabled': true
-            });
-        } else if (Array.isArray(target_agencies)) {
-            // Belirli acenteler
-            agencies = await Agency.find({
-                _id: { $in: target_agencies },
-                organization_id: req.user.organization_id,
-                is_active: true
-            });
-        } else {
-            return res.badRequest('target_agencies "all" veya acente ID dizisi olmalıdır');
+        // Offer sona erme zamanını hesapla
+        const expiresAt = offer_expires_at
+            ? new Date(offer_expires_at)
+            : new Date(Date.now() + hours_valid * 60 * 60 * 1000);
+
+        // İndirimli fiyatı hesapla
+        let discountedPrice = null;
+        if (original_price) {
+            if (discount_type === 'percentage') {
+                discountedPrice = original_price * (1 - discount_value / 100);
+            } else {
+                discountedPrice = Math.max(0, original_price - discount_value);
+            }
         }
 
-        if (agencies.length === 0) {
-            return res.badRequest('WhatsApp bildirimi açık acente bulunamadı');
-        }
-
-        // Flash Offer objesi oluştur
-        const flashOffer = {
+        // Flash Offer oluştur
+        const flashOffer = await FlashOffer.create({
+            hotel_org_id: req.user.organization_id,
             property_id,
-            property_name: property.name,
-            property_city: property.address?.city,
             room_type_id: room_type_id || null,
-            room_type_name: roomType?.name || 'Çeşitli Odalar',
-            room_count,
-            discount_percentage,
-            valid_from: new Date(valid_from).toLocaleDateString('de-DE'),
-            valid_to: new Date(valid_to).toLocaleDateString('de-DE'),
-            hours_valid,
-            message_note,
-            created_by: req.user._id,
-            created_at: new Date()
-        };
+            title: title || `${property.name} - ${discount_value}% İndirim`,
+            description,
+            discount_type,
+            discount_value,
+            original_price: original_price || null,
+            discounted_price: discountedPrice,
+            rooms_available,
+            rooms_booked: 0,
+            valid_from: new Date(),
+            valid_to: expiresAt,
+            offer_expires_at: expiresAt,
+            stay_date_from: new Date(stay_date_from),
+            stay_date_to: new Date(stay_date_to),
+            target_type,
+            target_agency_ids: target_type === 'specific_agencies' ? target_agency_ids : [],
+            status: 'active',
+            created_by_user_id: req.user._id,
+            currency: property.settings?.currency || 'EUR',
+            tags,
+        });
 
-        // WhatsApp mesajlarını gönder
-        const results = await whatsappService.sendFlashOffer(flashOffer, agencies);
+        // WhatsApp gönderimi (opsiyonel)
+        let whatsappResults = null;
+        if (send_whatsapp) {
+            // Partner acenteleri al
+            const partnerships = await HotelAgencyPartnership.find({
+                hotel_org_id: req.user.organization_id,
+                status: 'active',
+            }).populate('agency_org_id', 'name');
+
+            if (partnerships.length > 0) {
+                const offerDetails = {
+                    property_name: property.name,
+                    property_city: property.address?.city,
+                    room_type_name: roomType?.name || 'Çeşitli Odalar',
+                    room_count: rooms_available,
+                    discount_percentage: discount_type === 'percentage' ? discount_value : null,
+                    valid_from: new Date(stay_date_from).toLocaleDateString('de-DE'),
+                    valid_to: new Date(stay_date_to).toLocaleDateString('de-DE'),
+                    hours_valid,
+                };
+                whatsappResults = await whatsappService.sendFlashOffer(offerDetails, partnerships);
+            }
+        }
 
         // Audit log
         await logAction({
             action: 'CREATE',
             entity_type: 'flash_offer',
-            entity_id: null, // Flash offer kalıcı değil
-            description: `Flash offer oluşturuldu: ${property.name} - %${discount_percentage} indirim`,
-            changes: {
-                offer: flashOffer,
-                results: {
-                    sent: results.sent.length,
-                    failed: results.failed.length,
-                    skipped: results.skipped.length
-                }
-            }
+            entity_id: flashOffer._id,
+            description: `Flash offer oluşturuldu: ${property.name} - ${discount_type === 'percentage' ? '%' : '€'}${discount_value} indirim`,
+            changes: { offer_id: flashOffer._id },
         }, req.user);
 
         return res.created({
             offer: flashOffer,
-            notification_results: {
-                total_agencies: agencies.length,
-                sent: results.sent.length,
-                failed: results.failed.length,
-                skipped: results.skipped.length,
-                details: results
-            }
-        }, 'Flash Offer başarıyla oluşturuldu ve gönderildi');
+            whatsapp_sent: send_whatsapp && whatsappResults ? whatsappResults.sent?.length || 0 : 0,
+        }, 'Flash Offer başarıyla oluşturuldu');
+    });
+
+    /**
+     * Otel flash offer'larını listele
+     * GET /api/v1/flash-offers
+     */
+    list = asyncHandler(async (req, res) => {
+        const { status, page = 1, limit = 20 } = req.query;
+
+        const query = { hotel_org_id: req.user.organization_id };
+        if (status) {
+            query.status = status;
+        }
+
+        const skip = (Number(page) - 1) * Number(limit);
+
+        const [offers, total] = await Promise.all([
+            FlashOffer.find(query)
+                .populate('property_id', 'name address')
+                .populate('room_type_id', 'name code')
+                .sort({ createdAt: -1 })
+                .skip(skip)
+                .limit(Number(limit)),
+            FlashOffer.countDocuments(query),
+        ]);
+
+        return res.success({
+            items: offers,
+            pagination: {
+                page: Number(page),
+                limit: Number(limit),
+                total,
+                pages: Math.ceil(total / Number(limit)),
+            },
+        });
+    });
+
+    /**
+     * Flash Offer güncelle
+     * PUT /api/v1/flash-offers/:id
+     */
+    update = asyncHandler(async (req, res) => {
+        const { id } = req.params;
+        const updates = req.body;
+
+        const offer = await FlashOffer.findOne({
+            _id: id,
+            hotel_org_id: req.user.organization_id,
+        });
+
+        if (!offer) {
+            return res.notFound('Flash offer bulunamadı');
+        }
+
+        // Sadece aktif offer'lar güncellenebilir
+        if (offer.status !== 'active' && offer.status !== 'draft') {
+            return res.badRequest('Bu offer güncellenemez');
+        }
+
+        Object.assign(offer, updates);
+        await offer.save();
+
+        return res.success(offer, 'Flash offer güncellendi');
+    });
+
+    /**
+     * Flash Offer duraklat/devam ettir
+     * PUT /api/v1/flash-offers/:id/toggle-status
+     */
+    toggleStatus = asyncHandler(async (req, res) => {
+        const { id } = req.params;
+
+        const offer = await FlashOffer.findOne({
+            _id: id,
+            hotel_org_id: req.user.organization_id,
+        });
+
+        if (!offer) {
+            return res.notFound('Flash offer bulunamadı');
+        }
+
+        if (offer.status === 'active') {
+            offer.status = 'paused';
+        } else if (offer.status === 'paused') {
+            offer.status = 'active';
+        } else {
+            return res.badRequest('Bu offer\'ın durumu değiştirilemez');
+        }
+
+        await offer.save();
+        return res.success(offer, `Flash offer ${offer.status === 'active' ? 'aktifleştirildi' : 'duraklatıldı'}`);
+    });
+
+    /**
+     * Flash Offer sil
+     * DELETE /api/v1/flash-offers/:id
+     */
+    delete = asyncHandler(async (req, res) => {
+        const { id } = req.params;
+
+        const offer = await FlashOffer.findOneAndDelete({
+            _id: id,
+            hotel_org_id: req.user.organization_id,
+        });
+
+        if (!offer) {
+            return res.notFound('Flash offer bulunamadı');
+        }
+
+        await logAction({
+            action: 'DELETE',
+            entity_type: 'flash_offer',
+            entity_id: id,
+            description: `Flash offer silindi: ${offer.title}`,
+        }, req.user);
+
+        return res.success(null, 'Flash offer silindi');
     });
 
     /**

@@ -18,6 +18,8 @@ module.exports = {
   agency: require('./agency'),
   agencyContract: require('./agencyContract'),
   admin: require('./admin'),
+  partnership: require('./partnership'),
+  flashOfferB2B: require('./flashOfferB2B'),
 
   // B2C Routes (Skeleton - Ready for future implementation)
   traveler: require('./traveler'),

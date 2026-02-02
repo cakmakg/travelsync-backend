@@ -6,6 +6,7 @@ export interface User {
   last_name: string;
   role: 'super_admin' | 'admin';
   organization_id: string | null;
+  organization_type?: 'HOTEL' | 'AGENCY';
   phone?: string;
   avatar?: string;
   created_at: string;
@@ -68,16 +69,17 @@ export interface Property {
   description?: string;
   property_type: 'hotel' | 'resort' | 'hostel' | 'apartment' | 'villa';
   star_rating?: number;
+  total_rooms?: number;
   address: {
     street: string;
     city: string;
-    state: string;
-    postal_code: string;
+    state?: string;
+    postal_code?: string;
     country: string;
   };
   contact: {
-    phone: string;
-    email: string;
+    phone?: string;
+    email?: string;
     website?: string;
   };
   amenities: string[];
@@ -85,6 +87,14 @@ export interface Property {
   check_in_time: string;
   check_out_time: string;
   cancellation_policy: string;
+  policies?: {
+    check_in_time?: string;
+    check_out_time?: string;
+  };
+  settings?: {
+    timezone?: string;
+    currency?: string;
+  };
   is_active: boolean;
   created_at: string;
   updated_at: string;

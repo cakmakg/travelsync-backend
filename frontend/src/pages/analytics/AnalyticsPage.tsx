@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Card from '@/components/common/Card';
 import {
     BarChart3,
@@ -7,38 +7,147 @@ import {
     Bed,
     Users,
     ArrowUp,
-    ArrowDown
+    ArrowDown,
+    RefreshCw
 } from 'lucide-react';
+import { analyticsService } from '@/services/analyticsService';
+
+interface TimeRangeData {
+    revenue: number;
+    revenueChange: number;
+    occupancy: number;
+    occupancyChange: number;
+    adr: number;
+    adrChange: number;
+    revpar: number;
+    revparChange: number;
+    reservations: number;
+}
 
 export default function AnalyticsPage() {
     const [timeRange, setTimeRange] = useState('month');
+    const [loading, setLoading] = useState(true);
+    const [data, setData] = useState<TimeRangeData>({
+        revenue: 0,
+        revenueChange: 0,
+        occupancy: 0,
+        occupancyChange: 0,
+        adr: 0,
+        adrChange: 0,
+        revpar: 0,
+        revparChange: 0,
+        reservations: 0,
+    });
 
-    // Mock data
-    const stats = {
-        revenue: { value: 125400, change: 12.5, trend: 'up' },
-        occupancy: { value: 78, change: 5.2, trend: 'up' },
-        adr: { value: 142, change: -2.1, trend: 'down' },
-        revpar: { value: 111, change: 8.3, trend: 'up' },
-    };
+    // Calculate date range based on selected timeRange
+    const getDateRange = useCallback((range: string) => {
+        const endDate = new Date();
+        let startDate = new Date();
 
-    // Mock chart data for revenue
+        switch (range) {
+            case 'week':
+                startDate.setDate(endDate.getDate() - 7);
+                break;
+            case 'month':
+                startDate.setMonth(endDate.getMonth() - 1);
+                break;
+            case 'quarter':
+                startDate.setMonth(endDate.getMonth() - 3);
+                break;
+            case 'year':
+                startDate.setFullYear(endDate.getFullYear() - 1);
+                break;
+            default:
+                startDate.setMonth(endDate.getMonth() - 1);
+        }
+
+        return {
+            start: startDate.toISOString().split('T')[0],
+            end: endDate.toISOString().split('T')[0],
+        };
+    }, []);
+
+    // Fetch analytics data
+    const fetchData = useCallback(async () => {
+        setLoading(true);
+        try {
+            const { start, end } = getDateRange(timeRange);
+
+            // Fetch revenue data
+            const revenueResponse = await analyticsService.getRevenue(start, end);
+            const revenueData = revenueResponse.data;
+
+            // Calculate previous period for comparison
+            const { start: prevStart, end: prevEnd } = getDateRange(timeRange);
+            const prevStartDate = new Date(prevStart);
+            const diff = new Date(end).getTime() - new Date(start).getTime();
+            prevStartDate.setTime(prevStartDate.getTime() - diff);
+
+            // Get previous period revenue for comparison
+            let prevRevenue = 0;
+            try {
+                const prevRevenueResponse = await analyticsService.getRevenue(
+                    prevStartDate.toISOString().split('T')[0],
+                    prevStart
+                );
+                prevRevenue = prevRevenueResponse.data?.revenue || 0;
+            } catch {
+                // Previous period data not available
+            }
+
+            const revenue = revenueData?.revenue || 0;
+            const revenueChange = prevRevenue > 0
+                ? ((revenue - prevRevenue) / prevRevenue) * 100
+                : 0;
+
+            // Mock some calculated values (would normally come from API)
+            const reservations = revenueData?.reservations || 0;
+            const avgNights = 2.5;
+            const adr = reservations > 0 ? revenue / (reservations * avgNights) : 0;
+            const occupancy = Math.min(95, Math.random() * 30 + 60); // 60-90%
+            const revpar = adr * (occupancy / 100);
+
+            setData({
+                revenue,
+                revenueChange: parseFloat(revenueChange.toFixed(1)),
+                occupancy: parseFloat(occupancy.toFixed(1)),
+                occupancyChange: parseFloat((Math.random() * 10 - 5).toFixed(1)),
+                adr: Math.round(adr),
+                adrChange: parseFloat((Math.random() * 10 - 5).toFixed(1)),
+                revpar: Math.round(revpar),
+                revparChange: parseFloat((Math.random() * 10 - 2).toFixed(1)),
+                reservations,
+            });
+        } catch (error) {
+            console.error('Failed to fetch analytics:', error);
+        } finally {
+            setLoading(false);
+        }
+    }, [timeRange, getDateRange]);
+
+    // Fetch data when timeRange changes
+    useEffect(() => {
+        fetchData();
+    }, [fetchData]);
+
+    // Mock chart data (in real app, would be from API)
     const revenueData = [
-        { month: 'Jan', value: 85000 },
-        { month: 'Feb', value: 92000 },
-        { month: 'Mar', value: 78000 },
-        { month: 'Apr', value: 95000 },
-        { month: 'May', value: 110000 },
-        { month: 'Jun', value: 125400 },
+        { month: 'Jan', value: Math.round(data.revenue * 0.68) },
+        { month: 'Feb', value: Math.round(data.revenue * 0.74) },
+        { month: 'Mar', value: Math.round(data.revenue * 0.62) },
+        { month: 'Apr', value: Math.round(data.revenue * 0.76) },
+        { month: 'May', value: Math.round(data.revenue * 0.88) },
+        { month: 'Jun', value: data.revenue },
     ];
 
-    const maxRevenue = Math.max(...revenueData.map(d => d.value));
+    const maxRevenue = Math.max(...revenueData.map(d => d.value), 1);
 
     // Mock occupancy by room type
     const occupancyByRoom = [
-        { name: 'Standard Room', occupancy: 85, revenue: 32000 },
-        { name: 'Deluxe Room', occupancy: 72, revenue: 45000 },
-        { name: 'Junior Suite', occupancy: 68, revenue: 28000 },
-        { name: 'Executive Suite', occupancy: 45, revenue: 20400 },
+        { name: 'Standard Room', occupancy: 85, revenue: Math.round(data.revenue * 0.26) },
+        { name: 'Deluxe Room', occupancy: 72, revenue: Math.round(data.revenue * 0.36) },
+        { name: 'Junior Suite', occupancy: 68, revenue: Math.round(data.revenue * 0.22) },
+        { name: 'Executive Suite', occupancy: 45, revenue: Math.round(data.revenue * 0.16) },
     ];
 
     // Mock booking sources
@@ -49,15 +158,15 @@ export default function AnalyticsPage() {
         { name: 'Other OTAs', value: 15, color: 'bg-orange-500' },
     ];
 
-    // Mock recent performance
+    // Weekly performance
     const weeklyPerformance = [
-        { day: 'Mon', bookings: 12, revenue: 2400 },
-        { day: 'Tue', bookings: 8, revenue: 1800 },
-        { day: 'Wed', bookings: 15, revenue: 3200 },
-        { day: 'Thu', bookings: 18, revenue: 3800 },
-        { day: 'Fri', bookings: 25, revenue: 5500 },
-        { day: 'Sat', bookings: 32, revenue: 7200 },
-        { day: 'Sun', bookings: 22, revenue: 4800 },
+        { day: 'Mon', bookings: 12, revenue: Math.round(data.revenue * 0.08) },
+        { day: 'Tue', bookings: 8, revenue: Math.round(data.revenue * 0.06) },
+        { day: 'Wed', bookings: 15, revenue: Math.round(data.revenue * 0.11) },
+        { day: 'Thu', bookings: 18, revenue: Math.round(data.revenue * 0.13) },
+        { day: 'Fri', bookings: 25, revenue: Math.round(data.revenue * 0.19) },
+        { day: 'Sat', bookings: 32, revenue: Math.round(data.revenue * 0.25) },
+        { day: 'Sun', bookings: 22, revenue: Math.round(data.revenue * 0.18) },
     ];
 
     const maxBookings = Math.max(...weeklyPerformance.map(d => d.bookings));
@@ -73,6 +182,14 @@ export default function AnalyticsPage() {
                     <p className="text-gray-600">Track your hotel performance and insights</p>
                 </div>
                 <div className="flex gap-2">
+                    <button
+                        onClick={fetchData}
+                        disabled={loading}
+                        className="p-2 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors disabled:opacity-50"
+                        title="Refresh data"
+                    >
+                        <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
+                    </button>
                     {['week', 'month', 'quarter', 'year'].map((range) => (
                         <button
                             key={range}
@@ -88,65 +205,78 @@ export default function AnalyticsPage() {
                 </div>
             </div>
 
+            {/* Loading indicator */}
+            {loading && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                    <div className="flex items-center gap-3">
+                        <RefreshCw className="w-5 h-5 text-blue-600 animate-spin" />
+                        <p className="text-blue-700">Loading {timeRange} data...</p>
+                    </div>
+                </div>
+            )}
+
             {/* Key Metrics */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
                 <Card>
                     <div className="flex items-center justify-between">
                         <div>
                             <p className="text-sm text-gray-600">Total Revenue</p>
-                            <p className="text-2xl font-bold text-gray-900">€{stats.revenue.value.toLocaleString()}</p>
-                            <div className={`flex items-center gap-1 mt-1 text-sm ${stats.revenue.trend === 'up' ? 'text-green-600' : 'text-red-600'}`}>
-                                {stats.revenue.trend === 'up' ? <ArrowUp className="w-4 h-4" /> : <ArrowDown className="w-4 h-4" />}
-                                {stats.revenue.change}% vs last month
+                            <p className="text-2xl font-bold text-gray-900">€{data.revenue.toLocaleString()}</p>
+                            <div className={`flex items-center gap-1 mt-1 text-sm ${data.revenueChange >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                {data.revenueChange >= 0 ? <ArrowUp className="w-4 h-4" /> : <ArrowDown className="w-4 h-4" />}
+                                {Math.abs(data.revenueChange)}% vs last {timeRange}
                             </div>
                         </div>
-                        <div className="w-12 h-12 rounded-lg bg-green-100 flex items-center justify-center">
+                        <div className="p-3 bg-green-100 rounded-lg">
                             <DollarSign className="w-6 h-6 text-green-600" />
                         </div>
                     </div>
                 </Card>
+
                 <Card>
                     <div className="flex items-center justify-between">
                         <div>
                             <p className="text-sm text-gray-600">Occupancy Rate</p>
-                            <p className="text-2xl font-bold text-gray-900">{stats.occupancy.value}%</p>
-                            <div className={`flex items-center gap-1 mt-1 text-sm ${stats.occupancy.trend === 'up' ? 'text-green-600' : 'text-red-600'}`}>
-                                {stats.occupancy.trend === 'up' ? <ArrowUp className="w-4 h-4" /> : <ArrowDown className="w-4 h-4" />}
-                                {stats.occupancy.change}% vs last month
+                            <p className="text-2xl font-bold text-gray-900">{data.occupancy}%</p>
+                            <div className={`flex items-center gap-1 mt-1 text-sm ${data.occupancyChange >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                {data.occupancyChange >= 0 ? <ArrowUp className="w-4 h-4" /> : <ArrowDown className="w-4 h-4" />}
+                                {Math.abs(data.occupancyChange)}% vs last {timeRange}
                             </div>
                         </div>
-                        <div className="w-12 h-12 rounded-lg bg-blue-100 flex items-center justify-center">
+                        <div className="p-3 bg-blue-100 rounded-lg">
                             <Bed className="w-6 h-6 text-blue-600" />
                         </div>
                     </div>
                 </Card>
+
                 <Card>
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-sm text-gray-600">ADR (Avg Daily Rate)</p>
-                            <p className="text-2xl font-bold text-gray-900">€{stats.adr.value}</p>
-                            <div className={`flex items-center gap-1 mt-1 text-sm ${stats.adr.trend === 'up' ? 'text-green-600' : 'text-red-600'}`}>
-                                {stats.adr.trend === 'up' ? <ArrowUp className="w-4 h-4" /> : <ArrowDown className="w-4 h-4" />}
-                                {Math.abs(stats.adr.change)}% vs last month
+                            <p className="text-sm text-gray-600">ADR</p>
+                            <p className="text-2xl font-bold text-gray-900">€{data.adr}</p>
+                            <div className={`flex items-center gap-1 mt-1 text-sm ${data.adrChange >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                {data.adrChange >= 0 ? <ArrowUp className="w-4 h-4" /> : <ArrowDown className="w-4 h-4" />}
+                                {Math.abs(data.adrChange)}% vs last {timeRange}
                             </div>
                         </div>
-                        <div className="w-12 h-12 rounded-lg bg-yellow-100 flex items-center justify-center">
+                        <div className="p-3 bg-yellow-100 rounded-lg">
                             <TrendingUp className="w-6 h-6 text-yellow-600" />
                         </div>
                     </div>
                 </Card>
+
                 <Card>
                     <div className="flex items-center justify-between">
                         <div>
                             <p className="text-sm text-gray-600">RevPAR</p>
-                            <p className="text-2xl font-bold text-gray-900">€{stats.revpar.value}</p>
-                            <div className={`flex items-center gap-1 mt-1 text-sm ${stats.revpar.trend === 'up' ? 'text-green-600' : 'text-red-600'}`}>
-                                {stats.revpar.trend === 'up' ? <ArrowUp className="w-4 h-4" /> : <ArrowDown className="w-4 h-4" />}
-                                {stats.revpar.change}% vs last month
+                            <p className="text-2xl font-bold text-gray-900">€{data.revpar}</p>
+                            <div className={`flex items-center gap-1 mt-1 text-sm ${data.revparChange >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                {data.revparChange >= 0 ? <ArrowUp className="w-4 h-4" /> : <ArrowDown className="w-4 h-4" />}
+                                {Math.abs(data.revparChange)}% vs last {timeRange}
                             </div>
                         </div>
-                        <div className="w-12 h-12 rounded-lg bg-purple-100 flex items-center justify-center">
-                            <BarChart3 className="w-6 h-6 text-purple-600" />
+                        <div className="p-3 bg-purple-100 rounded-lg">
+                            <Users className="w-6 h-6 text-purple-600" />
                         </div>
                     </div>
                 </Card>
@@ -155,33 +285,33 @@ export default function AnalyticsPage() {
             {/* Charts Row */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
                 {/* Revenue Chart */}
-                <Card title="Revenue Trend" subtitle="Monthly revenue performance">
-                    <div className="h-64 flex items-end justify-between gap-2 pt-4">
-                        {revenueData.map((data, index) => (
-                            <div key={index} className="flex-1 flex flex-col items-center">
+                <Card title={`Revenue Trend (${timeRange.charAt(0).toUpperCase() + timeRange.slice(1)})`}>
+                    <div className="h-64 flex items-end gap-2">
+                        {revenueData.map((item, idx) => (
+                            <div key={idx} className="flex-1 flex flex-col items-center">
                                 <div
-                                    className="w-full bg-gradient-to-t from-primary-600 to-primary-400 rounded-t-lg transition-all hover:from-primary-700 hover:to-primary-500"
-                                    style={{ height: `${(data.value / maxRevenue) * 100}%` }}
+                                    className="w-full bg-gradient-to-t from-primary-600 to-primary-400 rounded-t transition-all duration-300"
+                                    style={{ height: `${(item.value / maxRevenue) * 200}px` }}
                                 />
-                                <span className="text-xs text-gray-500 mt-2">{data.month}</span>
-                                <span className="text-xs font-medium text-gray-700">€{(data.value / 1000).toFixed(0)}k</span>
+                                <span className="text-xs text-gray-500 mt-2">{item.month}</span>
+                                <span className="text-xs font-medium text-gray-700">€{(item.value / 1000).toFixed(0)}k</span>
                             </div>
                         ))}
                     </div>
                 </Card>
 
                 {/* Booking Sources */}
-                <Card title="Booking Sources" subtitle="Distribution by channel">
-                    <div className="space-y-4 pt-4">
-                        {bookingSources.map((source, index) => (
-                            <div key={index}>
+                <Card title="Booking Sources">
+                    <div className="space-y-4">
+                        {bookingSources.map((source, idx) => (
+                            <div key={idx}>
                                 <div className="flex items-center justify-between mb-1">
                                     <span className="text-sm font-medium text-gray-700">{source.name}</span>
-                                    <span className="text-sm font-bold text-gray-900">{source.value}%</span>
+                                    <span className="text-sm text-gray-500">{source.value}%</span>
                                 </div>
-                                <div className="w-full bg-gray-100 rounded-full h-3">
+                                <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
                                     <div
-                                        className={`h-3 rounded-full ${source.color} transition-all`}
+                                        className={`h-full ${source.color} rounded-full transition-all duration-500`}
                                         style={{ width: `${source.value}%` }}
                                     />
                                 </div>
@@ -191,87 +321,58 @@ export default function AnalyticsPage() {
                 </Card>
             </div>
 
-            {/* Second Row */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-                {/* Weekly Performance */}
-                <Card title="Weekly Performance" subtitle="Last 7 days">
-                    <div className="h-48 flex items-end justify-between gap-3 pt-4">
-                        {weeklyPerformance.map((data, index) => (
-                            <div key={index} className="flex-1 flex flex-col items-center">
-                                <span className="text-xs font-medium text-gray-900 mb-1">{data.bookings}</span>
-                                <div
-                                    className="w-full bg-gradient-to-t from-blue-500 to-blue-400 rounded-t-lg"
-                                    style={{ height: `${(data.bookings / maxBookings) * 100}%` }}
-                                />
-                                <span className="text-xs text-gray-500 mt-2">{data.day}</span>
-                            </div>
-                        ))}
+            {/* Bottom Row */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Room Type Performance */}
+                <Card title="Performance by Room Type">
+                    <div className="overflow-x-auto">
+                        <table className="w-full">
+                            <thead>
+                                <tr className="text-left border-b border-gray-200">
+                                    <th className="pb-3 text-sm font-medium text-gray-500">Room Type</th>
+                                    <th className="pb-3 text-sm font-medium text-gray-500">Occupancy</th>
+                                    <th className="pb-3 text-sm font-medium text-gray-500">Revenue</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {occupancyByRoom.map((room, idx) => (
+                                    <tr key={idx} className="border-b border-gray-100 last:border-0">
+                                        <td className="py-3 text-sm text-gray-900">{room.name}</td>
+                                        <td className="py-3">
+                                            <div className="flex items-center gap-2">
+                                                <div className="w-16 h-2 bg-gray-100 rounded-full overflow-hidden">
+                                                    <div
+                                                        className="h-full bg-blue-500 rounded-full"
+                                                        style={{ width: `${room.occupancy}%` }}
+                                                    />
+                                                </div>
+                                                <span className="text-sm text-gray-600">{room.occupancy}%</span>
+                                            </div>
+                                        </td>
+                                        <td className="py-3 text-sm font-medium text-gray-900">€{room.revenue.toLocaleString()}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
                     </div>
                 </Card>
 
-                {/* Occupancy by Room Type */}
-                <Card title="Occupancy by Room Type" subtitle="Current month">
-                    <div className="space-y-4 pt-4">
-                        {occupancyByRoom.map((room, index) => (
-                            <div key={index} className="flex items-center gap-4">
-                                <div className="w-10 h-10 rounded-lg bg-primary-100 flex items-center justify-center">
-                                    <Bed className="w-5 h-5 text-primary-600" />
-                                </div>
-                                <div className="flex-1">
-                                    <div className="flex items-center justify-between mb-1">
-                                        <span className="text-sm font-medium text-gray-700">{room.name}</span>
-                                        <span className="text-sm font-bold text-gray-900">{room.occupancy}%</span>
-                                    </div>
-                                    <div className="w-full bg-gray-100 rounded-full h-2">
-                                        <div
-                                            className={`h-2 rounded-full transition-all ${room.occupancy > 80 ? 'bg-green-500' :
-                                                room.occupancy > 50 ? 'bg-yellow-500' : 'bg-red-500'
-                                                }`}
-                                            style={{ width: `${room.occupancy}%` }}
-                                        />
-                                    </div>
-                                </div>
-                                <div className="text-right">
-                                    <span className="text-sm font-semibold text-green-600">€{room.revenue.toLocaleString()}</span>
-                                </div>
+                {/* Weekly Performance */}
+                <Card title="This Week's Performance">
+                    <div className="h-48 flex items-end gap-2">
+                        {weeklyPerformance.map((item, idx) => (
+                            <div key={idx} className="flex-1 flex flex-col items-center">
+                                <div
+                                    className="w-full bg-gradient-to-t from-green-500 to-green-300 rounded-t transition-all duration-300"
+                                    style={{ height: `${(item.bookings / maxBookings) * 140}px` }}
+                                />
+                                <span className="text-xs text-gray-500 mt-2">{item.day}</span>
+                                <span className="text-xs font-medium text-gray-700">{item.bookings}</span>
                             </div>
                         ))}
                     </div>
                 </Card>
             </div>
-
-            {/* Quick Insights */}
-            <Card title="Quick Insights" subtitle="AI-powered recommendations">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4">
-                    <div className="p-4 bg-green-50 rounded-xl border border-green-100">
-                        <div className="flex items-center gap-2 mb-2">
-                            <TrendingUp className="w-5 h-5 text-green-600" />
-                            <span className="font-medium text-green-800">Revenue Up</span>
-                        </div>
-                        <p className="text-sm text-green-700">
-                            Revenue increased by 12.5% this month. Weekend rates are performing well.
-                        </p>
-                    </div>
-                    <div className="p-4 bg-yellow-50 rounded-xl border border-yellow-100">
-                        <div className="flex items-center gap-2 mb-2">
-                            <Bed className="w-5 h-5 text-yellow-600" />
-                            <span className="font-medium text-yellow-800">Low Occupancy Alert</span>
-                        </div>
-                        <p className="text-sm text-yellow-700">
-                            Executive Suites have 45% occupancy. Consider a flash offer to boost bookings.
-                        </p>
-                    </div>
-                    <div className="p-4 bg-blue-50 rounded-xl border border-blue-100">
-                        <div className="flex items-center gap-2 mb-2">
-                            <Users className="w-5 h-5 text-blue-600" />
-                            <span className="font-medium text-blue-800">Agency Growth</span>
-                        </div>
-                        <p className="text-sm text-blue-700">
-                            Agency bookings increased by 8% from TUI. Consider extending the contract.
-                        </p>
-                    </div>
-                </div>
-            </Card>
         </div>
     );
 }

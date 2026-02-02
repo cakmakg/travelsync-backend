@@ -92,3 +92,98 @@ exports.sendCancellation = async (reservation, property, reason) => {
     logger.error('sendCancellation error', error);
   }
 };
+
+/**
+ * Send new reservation alert to hotel
+ */
+exports.sendNewReservationAlert = async (reservation, property) => {
+  try {
+    const to = property?.contact?.email;
+    if (!to) {
+      logger.warn('Hotel email not available for reservation alert');
+      return;
+    }
+
+    const html = renderTemplate('new-reservation-alert', {
+      booking_reference: reservation.booking_reference || '',
+      guest_name: reservation.guest?.name || '',
+      guest_email: reservation.guest?.email || '',
+      guest_phone: reservation.guest?.phone || '',
+      special_requests: reservation.guest?.special_requests || 'None',
+      property_name: property?.name || '',
+      check_in_date: (reservation.check_in_date || '').toString().split('T')[0],
+      check_out_date: (reservation.check_out_date || '').toString().split('T')[0],
+      nights: reservation.nights || '',
+      room_type: reservation.room_type_id?.name || '',
+      guests: `${reservation.guests?.adults || 0} adults, ${reservation.guests?.children || 0} children`,
+      currency: reservation.currency || 'EUR',
+      total_with_tax: reservation.total_with_tax || '',
+      source: reservation.source || 'DIRECT',
+    });
+
+    const subject = `🆕 New Reservation - ${reservation.booking_reference || ''}`;
+    exports.sendMail({ to, subject, html }).catch((err) => logger.error('New reservation alert failed', err));
+  } catch (error) {
+    logger.error('sendNewReservationAlert error', error);
+  }
+};
+
+/**
+ * Send check-in reminder to guest (24 hours before)
+ */
+exports.sendCheckInReminder = async (reservation, property) => {
+  try {
+    const to = reservation.guest?.email;
+    if (!to) throw new Error('Guest email not available');
+
+    const html = renderTemplate('check-in-reminder', {
+      booking_reference: reservation.booking_reference || '',
+      guest_name: reservation.guest?.name || '',
+      property_name: property?.name || '',
+      check_in_date: (reservation.check_in_date || '').toString().split('T')[0],
+      check_out_date: (reservation.check_out_date || '').toString().split('T')[0],
+      room_type: reservation.room_type_id?.name || '',
+      guests: `${reservation.guests?.adults || 0} adults, ${reservation.guests?.children || 0} children`,
+      property_phone: property?.contact?.phone || '',
+      property_email: property?.contact?.email || '',
+    });
+
+    const subject = `📅 Reminder: Check-in Tomorrow - ${reservation.booking_reference || ''}`;
+    exports.sendMail({ to, subject, html }).catch((err) => logger.error('Check-in reminder failed', err));
+  } catch (error) {
+    logger.error('sendCheckInReminder error', error);
+  }
+};
+
+/**
+ * Send option expiring warning to agency
+ */
+exports.sendOptionExpiringWarning = async (option, property, agencyEmail) => {
+  try {
+    if (!agencyEmail) {
+      logger.warn('Agency email not available for option warning');
+      return;
+    }
+
+    const expiresAt = option.option_expires_at ? new Date(option.option_expires_at) : null;
+    const hoursRemaining = expiresAt ? Math.max(0, Math.floor((expiresAt - new Date()) / (1000 * 60 * 60))) : 0;
+
+    const html = renderTemplate('option-expiring', {
+      booking_reference: option.booking_reference || '',
+      property_name: property?.name || '',
+      check_in_date: (option.check_in_date || '').toString().split('T')[0],
+      check_out_date: (option.check_out_date || '').toString().split('T')[0],
+      room_type: option.room_type_id?.name || '',
+      currency: option.currency || 'EUR',
+      total_with_tax: option.total_with_tax || '',
+      hours_remaining: hoursRemaining,
+      expires_at: expiresAt ? expiresAt.toLocaleString() : '',
+    });
+
+    const subject = `⏰ Option Expiring Soon - ${option.booking_reference || ''}`;
+    exports.sendMail({ to: agencyEmail, subject, html }).catch((err) => logger.error('Option expiring warning failed', err));
+  } catch (error) {
+    logger.error('sendOptionExpiringWarning error', error);
+  }
+};
+

@@ -148,8 +148,31 @@ const checkPermission = (resource, action) => {
   };
 };
 
+/**
+ * Check if user is Super Admin
+ * Super Admin has access to all organizations and global data
+ */
+const isSuperAdmin = (req, res, next) => {
+  if (!req.user) {
+    return res.status(401).json({
+      success: false,
+      error: { message: 'Not authenticated.' },
+    });
+  }
+
+  if (req.user.role !== 'super_admin') {
+    return res.status(403).json({
+      success: false,
+      error: { message: 'Super Admin yetkisi gerekli.' },
+    });
+  }
+
+  next();
+};
+
 module.exports = {
   authenticate,
   authorize,
   checkPermission,
+  isSuperAdmin,
 };

@@ -137,6 +137,12 @@ const OrganizationSchema = new mongoose.Schema(
       },
     },
 
+    // Onboarding status
+    onboarding_completed: {
+      type: Boolean,
+      default: false,
+    },
+
     is_active: {
       type: Boolean,
       default: true,

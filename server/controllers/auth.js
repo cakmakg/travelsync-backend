@@ -216,14 +216,19 @@ const login = async (req, res) => {
     // Generate tokens
     const tokens = generateTokens(user);
 
-    // Remove password from response
+    // Get organization info for response
+    const organization = await Organization.findById(user.organization_id).select('name type country currency');
+
+    // Remove password from response and add organization_type
     const userResponse = user.toObject();
     delete userResponse.password;
+    userResponse.organization_type = organization?.type || null;
 
     res.status(200).json({
       success: true,
       data: {
         user: userResponse,
+        organization: organization?.toObject() || null,
         ...tokens,
       },
       message: 'Login successful',

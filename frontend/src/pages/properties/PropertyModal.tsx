@@ -14,11 +14,12 @@ const propertySchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
   code: z.string().min(2, 'Code must be at least 2 characters').max(10, 'Code must be at most 10 characters'),
   description: z.string().optional(),
+  total_rooms: z.number().min(1, 'Total rooms is required'),
   street: z.string().min(1, 'Street is required'),
   city: z.string().min(1, 'City is required'),
-  state: z.string().optional(),
-  postal_code: z.string().optional(),
-  country: z.string().min(1, 'Country is required'),
+  state: z.string().min(1, 'State is required'),
+  postal_code: z.string().min(1, 'Postal code is required'),
+  country: z.string().length(2, 'Country code must be 2 characters'),
   phone: z.string().optional(),
   email: z.string().email('Invalid email').optional().or(z.literal('')),
   website: z.string().optional(),
@@ -38,8 +39,18 @@ interface PropertyModalProps {
 }
 
 const COUNTRIES = [
-  'Germany', 'Austria', 'Switzerland', 'Turkey', 'Spain', 'Italy',
-  'France', 'United Kingdom', 'Netherlands', 'Belgium', 'Greece', 'Portugal'
+  { code: 'DE', name: 'Germany' },
+  { code: 'AT', name: 'Austria' },
+  { code: 'CH', name: 'Switzerland' },
+  { code: 'TR', name: 'Turkey' },
+  { code: 'ES', name: 'Spain' },
+  { code: 'IT', name: 'Italy' },
+  { code: 'FR', name: 'France' },
+  { code: 'GB', name: 'United Kingdom' },
+  { code: 'NL', name: 'Netherlands' },
+  { code: 'BE', name: 'Belgium' },
+  { code: 'GR', name: 'Greece' },
+  { code: 'PT', name: 'Portugal' },
 ];
 
 const CURRENCIES = ['EUR', 'USD', 'GBP', 'CHF', 'TRY'];
@@ -65,11 +76,12 @@ export default function PropertyModal({ isOpen, onClose, property }: PropertyMod
       name: '',
       code: '',
       description: '',
+      total_rooms: 10,
       street: '',
       city: '',
       state: '',
       postal_code: '',
-      country: 'Germany',
+      country: 'DE',
       phone: '',
       email: '',
       website: '',
@@ -86,11 +98,12 @@ export default function PropertyModal({ isOpen, onClose, property }: PropertyMod
       setValue('name', property.name);
       setValue('code', property.code);
       setValue('description', property.description || '');
+      setValue('total_rooms', property.total_rooms || 10);
       setValue('street', property.address?.street || '');
       setValue('city', property.address?.city || '');
       setValue('state', property.address?.state || '');
       setValue('postal_code', property.address?.postal_code || '');
-      setValue('country', property.address?.country || 'Germany');
+      setValue('country', property.address?.country || 'DE');
       setValue('phone', property.contact?.phone || '');
       setValue('email', property.contact?.email || '');
       setValue('website', property.contact?.website || '');
@@ -109,6 +122,7 @@ export default function PropertyModal({ isOpen, onClose, property }: PropertyMod
       name: data.name,
       code: data.code.toUpperCase(),
       description: data.description,
+      total_rooms: data.total_rooms,
       address: {
         street: data.street,
         city: data.city,
@@ -204,7 +218,7 @@ export default function PropertyModal({ isOpen, onClose, property }: PropertyMod
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-3 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Star Rating</label>
                   <select
@@ -217,6 +231,15 @@ export default function PropertyModal({ isOpen, onClose, property }: PropertyMod
                       </option>
                     ))}
                   </select>
+                </div>
+                <div>
+                  <Input
+                    label="Total Rooms"
+                    type="number"
+                    placeholder="e.g. 50"
+                    {...register('total_rooms', { valueAsNumber: true })}
+                    error={errors.total_rooms?.message}
+                  />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Currency</label>
@@ -280,7 +303,7 @@ export default function PropertyModal({ isOpen, onClose, property }: PropertyMod
                     className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500"
                   >
                     {COUNTRIES.map((country) => (
-                      <option key={country} value={country}>{country}</option>
+                      <option key={country.code} value={country.code}>{country.name}</option>
                     ))}
                   </select>
                 </div>

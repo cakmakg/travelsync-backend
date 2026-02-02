@@ -13,13 +13,13 @@ const asyncHandler = require('../middlewares/asyncHandler');
 class ReservationController extends BaseController {
   constructor() {
     super(Reservation, 'reservation');
-    
+
     // Disable organization filtering (reservations filter by property)
     this.useOrganizationFilter = false;
-    
+
     // Search fields for getAll
     this.searchFields = ['booking_reference', 'guest.name', 'guest.email'];
-    
+
     // Populate fields
     this.populateFields = 'property_id room_type_id rate_plan_id created_by_user_id';
   }
@@ -216,6 +216,7 @@ class ReservationController extends BaseController {
 
   /**
    * 📊 GET STATISTICS
+   * Get reservation statistics  /**
    * Get reservation statistics
    */
   getStats = asyncHandler(async (req, res) => {
@@ -228,6 +229,44 @@ class ReservationController extends BaseController {
     const stats = await reservationService.getStats(propertyId, req.user);
 
     return res.success(stats);
+  });
+
+  // =============================================
+  // OPTION (GEÇİCİ KİLİTLEME) METHODS
+  // =============================================
+
+  /**
+   * Create option (geçici kilitleme)
+   * POST /api/v1/reservations/options
+   */
+  createOption = asyncHandler(async (req, res) => {
+    const option = await reservationService.createOption(req.body, req.user);
+    return res.created(option, 'Option created successfully. Expires at: ' + option.option_expires_at);
+  });
+
+  /**
+   * Confirm option - Option'ı rezervasyona çevir
+   * POST /api/v1/reservations/:id/confirm-option
+   */
+  confirmOption = asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const { guest } = req.body;
+
+    if (!guest || !guest.name || !guest.email || !guest.phone) {
+      return res.badRequest('Guest information (name, email, phone) is required');
+    }
+
+    const reservation = await reservationService.confirmOption(id, guest, req.user);
+    return res.success(reservation, { message: 'Option confirmed as reservation' });
+  });
+
+  /**
+   * Expire all expired options
+   * POST /api/v1/reservations/options/expire
+   */
+  expireOptions = asyncHandler(async (req, res) => {
+    const result = await reservationService.expireOptions();
+    return res.success(result, { message: `Expired ${result.expired} options` });
   });
 }
 

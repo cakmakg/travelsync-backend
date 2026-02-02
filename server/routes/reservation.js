@@ -120,4 +120,31 @@ router.delete('/:id', authenticate, authorize('admin'), reservationController.de
  */
 router.post('/:id/restore', authenticate, authorize('admin'), reservationController.restore);
 
+// =============================================
+// OPTION (GEÇİCİ KİLİTLEME) ROUTES
+// =============================================
+
+/**
+ * @route   POST /api/v1/reservations/options
+ * @desc    Create option (geçici kilitleme) - Acente oda kilitler
+ * @access  Private
+ * @body    { property_id, room_type_id, rate_plan_id, check_in_date, check_out_date, option_hours?, agency_id? }
+ */
+router.post('/options', authenticate, reservationController.createOption);
+
+/**
+ * @route   POST /api/v1/reservations/:id/confirm-option
+ * @desc    Confirm option - Option'ı gerçek rezervasyona çevir
+ * @access  Private
+ * @body    { guest: { name, email, phone, country?, special_requests? } }
+ */
+router.post('/:id/confirm-option', authenticate, reservationController.confirmOption);
+
+/**
+ * @route   POST /api/v1/reservations/options/expire
+ * @desc    Expire all expired options (cron job için)
+ * @access  Private (Admin only)
+ */
+router.post('/options/expire', authenticate, authorize('admin'), reservationController.expireOptions);
+
 module.exports = router;

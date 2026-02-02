@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f5f5f5;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: #fff;
+            border-radius: 8px;
+            padding: 30px;
+        }
+
+        .header {
+            text-align: center;
+            border-bottom: 2px solid #10b981;
+            padding-bottom: 20px;
+            margin-bottom: 20px;
+        }
+
+        .logo {
+            font-size: 24px;
+            font-weight: bold;
+            color: #10b981;
+        }
+
+        .content {
+            line-height: 1.6;
+            color: #333;
+        }
+
+        .info-box {
+            background: #f0fdf4;
+            border-left: 4px solid #10b981;
+            padding: 15px;
+            margin: 20px 0;
+        }
+
+        .footer {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+            text-align: center;
+            color: #666;
+            font-size: 12px;
+        }
+
+        .highlight {
+            background: #fef3c7;
+            padding: 10px;
+            border-radius: 6px;
+            margin: 15px 0;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">🏨 TravelSync</div>
+            <h2>📢 New Reservation Alert</h2>
+        </div>
+        <div class="content">
+            <p>Hello,</p>
+
+            <p>A new reservation has been received for <strong>{{ property_name }}</strong>.</p>
+
+            <div class="info-box">
+                <strong>Reservation Details:</strong><br>
+                📝 Reference: <strong>{{ booking_reference }}</strong><br>
+                📅 Check-in: {{ check_in_date }}<br>
+                📅 Check-out: {{ check_out_date }}<br>
+                🌙 Nights: {{ nights }}<br>
+                🛏️ Room: {{ room_type }}<br>
+                👥 Guests: {{ guests }}
+            </div>
+
+            <div class="highlight">
+                <strong>Guest Information:</strong><br>
+                👤 Name: {{ guest_name }}<br>
+                📧 Email: {{ guest_email }}<br>
+                📞 Phone: {{ guest_phone }}<br>
+                📝 Special Requests: {{ special_requests }}
+            </div>
+
+            <p><strong>Source:</strong> {{ source }}<br>
+                <strong>Total:</strong> {{ currency }} {{ total_with_tax }}
+            </p>
+
+            <p>Please confirm this reservation in your dashboard.</p>
+
+            <p>Best regards,<br><strong>TravelSync Team</strong></p>
+        </div>
+        <div class="footer">
+            This is an automated notification from TravelSync.
+        </div>
+    </div>
+</body>
+
+</html>

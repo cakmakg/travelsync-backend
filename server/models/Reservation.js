@@ -160,16 +160,32 @@ const ReservationSchema = new mongoose.Schema(
     status: {
       type: String,
       enum: [
+        'option',      // Geçici kilitleme (24-48 saat)
         'pending',
         'confirmed',
         'checked_in',
         'checked_out',
         'cancelled',
         'no_show',
+        'option_expired',  // Süresi dolmuş option
       ],
       default: 'pending',
       required: true,
       index: true,
+    },
+
+    // Option (geçici kilitleme) için süre
+    option_expires_at: {
+      type: Date,
+      default: null,
+      index: true,
+    },
+
+    option_hours: {
+      type: Number,
+      default: 24,  // Varsayılan 24 saat
+      min: 1,
+      max: 72,
     },
 
     // Booking source
@@ -342,6 +358,34 @@ ReservationSchema.methods.cancel = async function (reason) {
 ReservationSchema.methods.markAsNoShow = async function () {
   this.status = 'no_show';
   return this.save();
+};
+
+// Option (Geçici Kilitleme) Metotları
+ReservationSchema.methods.confirmOption = async function () {
+  if (this.status !== 'option') {
+    throw new Error('Only option reservations can be confirmed');
+  }
+  if (this.isOptionExpired()) {
+    throw new Error('Option has expired');
+  }
+  this.status = 'confirmed';
+  this.confirmed_at = new Date();
+  this.option_expires_at = null;
+  return this.save();
+};
+
+ReservationSchema.methods.expireOption = async function () {
+  if (this.status !== 'option') {
+    throw new Error('Only option reservations can expire');
+  }
+  this.status = 'option_expired';
+  return this.save();
+};
+
+ReservationSchema.methods.isOptionExpired = function () {
+  if (this.status !== 'option') return false;
+  if (!this.option_expires_at) return false;
+  return new Date() > this.option_expires_at;
 };
 
 ReservationSchema.methods.getTotalPrice = function () {

@@ -45,18 +45,18 @@ const BED_CONFIGURATIONS = [
 ];
 
 const COMMON_AMENITIES = [
-  'WiFi',
-  'Air Conditioning',
-  'TV',
-  'Mini Bar',
-  'Safe',
-  'Balcony',
-  'Sea View',
-  'City View',
-  'Bathtub',
-  'Shower',
-  'Hair Dryer',
-  'Coffee Machine',
+  { label: 'WiFi', value: 'wifi' },
+  { label: 'Air Conditioning', value: 'air_conditioning' },
+  { label: 'TV', value: 'tv' },
+  { label: 'Mini Bar', value: 'minibar' },
+  { label: 'Safe', value: 'safe' },
+  { label: 'Balcony', value: 'balcony' },
+  { label: 'Sea View', value: 'sea_view' },
+  { label: 'City View', value: 'city_view' },
+  { label: 'Bathtub', value: 'bathtub' },
+  { label: 'Shower', value: 'shower' },
+  { label: 'Hair Dryer', value: 'hairdryer' },
+  { label: 'Coffee Machine', value: 'coffee_machine' },
 ];
 
 export default function RoomTypeModal({
@@ -128,16 +128,15 @@ export default function RoomTypeModal({
       name: data.name,
       code: data.code.toUpperCase(),
       description: data.description,
-      max_occupancy: {
+      capacity: {
         adults: data.max_adults,
         children: data.max_children,
-        infants: data.max_infants,
       },
       bed_configuration: data.bed_configuration,
       size_sqm: data.size_sqm || undefined,
       total_quantity: data.total_quantity,
       amenities: data.amenities
-        ? data.amenities.split(',').map((a) => a.trim()).filter(Boolean)
+        ? data.amenities.split(',').map((a) => a.trim().toLowerCase().replace(/\s+/g, '_')).filter(Boolean)
         : [],
     };
 
@@ -337,19 +336,19 @@ export default function RoomTypeModal({
               <div className="flex flex-wrap gap-1 mt-2">
                 {COMMON_AMENITIES.slice(0, 6).map((amenity) => (
                   <button
-                    key={amenity}
+                    key={amenity.value}
                     type="button"
                     onClick={() => {
                       const current = (document.querySelector('textarea[name="amenities"]') as HTMLTextAreaElement)?.value || '';
                       const amenities = current ? current.split(',').map(a => a.trim()) : [];
-                      if (!amenities.includes(amenity)) {
-                        amenities.push(amenity);
+                      if (!amenities.includes(amenity.value)) {
+                        amenities.push(amenity.value);
                         setValue('amenities', amenities.join(', '));
                       }
                     }}
                     className="text-xs bg-gray-100 hover:bg-gray-200 text-gray-600 px-2 py-1 rounded transition-colors"
                   >
-                    + {amenity}
+                    + {amenity.label}
                   </button>
                 ))}
               </div>

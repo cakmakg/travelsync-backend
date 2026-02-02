@@ -75,7 +75,7 @@ exports.createReservation = async (data, user) => {
     logger.debug('[Reservation] Availability checked: OK');
 
     // 4. Calculate price
-    logger.debug(`[Reservation] Calculating price for: ${JSON.stringify({check_in_date, check_out_date})}`);
+    logger.debug(`[Reservation] Calculating price for: ${JSON.stringify({ check_in_date, check_out_date })}`);
 
     const totalPrice = await Price.calculateTotalPrice(
       property_id,
@@ -100,7 +100,7 @@ exports.createReservation = async (data, user) => {
 
     if (agency) {
       const rate = agency.getCommissionRate(property_id);
-      
+
       // Validate commission rate
       if (rate < 0 || rate > 50) {
         await session.abortTransaction();
@@ -205,7 +205,7 @@ exports.getAllReservations = async (filters = {}, user) => {
     // Reservation doesn't have organization_id, we filter by property.organization_id
     const Property = require('../models').Property;
     const query = {};
-    
+
     // If property_id is provided, validate it belongs to user's organization
     if (property_id) {
       const property = await Property.findById(property_id);
@@ -464,7 +464,7 @@ exports.updateReservation = async (id, updates, user) => {
   try {
     // First, verify reservation belongs to user's organization
     const reservation = await Reservation.findById(id).populate('property_id');
-    
+
     if (!reservation) {
       throw new Error('Reservation not found');
     }
@@ -540,10 +540,10 @@ exports.cancelReservation = async (id, reason, _user) => {
 
     // Reverse agency stats (if agency booking) (WITHIN TRANSACTION)
     if (reservation.agency_id) {
-      const totalPrice = typeof reservation.total_price === 'object' 
-        ? parseFloat(reservation.total_price.toString()) 
+      const totalPrice = typeof reservation.total_price === 'object'
+        ? parseFloat(reservation.total_price.toString())
         : reservation.total_price;
-      const commissionAmount = reservation.commission?.amount 
+      const commissionAmount = reservation.commission?.amount
         ? (typeof reservation.commission.amount === 'object'
           ? parseFloat(reservation.commission.amount.toString())
           : reservation.commission.amount)
@@ -595,7 +595,7 @@ exports.checkInReservation = async (id, user) => {
   try {
     // First, verify reservation belongs to user's organization
     const reservation = await Reservation.findById(id).populate('property_id');
-    
+
     if (!reservation) {
       throw new Error('Reservation not found');
     }
@@ -620,7 +620,7 @@ exports.checkOutReservation = async (id, user) => {
   try {
     // First, verify reservation belongs to user's organization
     const reservation = await Reservation.findById(id).populate('property_id');
-    
+
     if (!reservation) {
       throw new Error('Reservation not found');
     }
@@ -753,6 +753,202 @@ exports.markCommissionPaid = async (agencyId, bookingIds) => {
     };
   } catch (error) {
     console.error('[Reservation Service] MarkCommissionPaid error:', error);
+    throw error;
+  }
+};
+
+/**
+ * Create option (geçici kilitleme) - Agency 24-48 saat oda kilitler
+ */
+exports.createOption = async (data, user) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    const {
+      property_id,
+      room_type_id,
+      rate_plan_id,
+      check_in_date,
+      check_out_date,
+      agency_id,
+      option_hours = 24,
+      rooms_requested = 1,
+    } = data;
+
+    logger.info(`[Option] Creating option: ${JSON.stringify({ property_id, room_type_id, option_hours })}`);
+
+    // 1. Validate property
+    const Property = require('../models').Property;
+    const property = await Property.findById(property_id).session(session);
+    if (!property) {
+      await session.abortTransaction();
+      throw new Error('Property not found');
+    }
+
+    // 2. Check availability
+    const isAvailable = await Inventory.checkAvailability(
+      property_id,
+      room_type_id,
+      new Date(check_in_date),
+      new Date(check_out_date),
+      rooms_requested
+    );
+
+    if (!isAvailable.available) {
+      await session.abortTransaction();
+      throw new Error(`Not available: ${isAvailable.reason}`);
+    }
+
+    // 3. Calculate price
+    const totalPrice = await Price.calculateTotalPrice(
+      property_id,
+      room_type_id,
+      rate_plan_id,
+      new Date(check_in_date),
+      new Date(check_out_date)
+    );
+    const finalPrice = typeof totalPrice === 'object' ? totalPrice.total : totalPrice;
+
+    // 4. Calculate option expiry
+    const optionExpiresAt = new Date();
+    optionExpiresAt.setHours(optionExpiresAt.getHours() + option_hours);
+
+    // 5. Create option reservation
+    const [option] = await Reservation.create([{
+      ...data,
+      created_by_user_id: user._id,
+      total_price: finalPrice,
+      total_with_tax: Number((finalPrice * 1.07).toFixed(2)),
+      status: 'option',
+      option_expires_at: optionExpiresAt,
+      option_hours,
+      source: agency_id ? 'AGENCY' : 'DIRECT',
+      agency_id: agency_id || undefined,
+    }], { session });
+
+    logger.info(`[Option] Created: ${option._id}, expires at: ${optionExpiresAt}`);
+
+    // 6. Update inventory (hold rooms)
+    await Inventory.updateOnBooking(
+      property_id,
+      room_type_id,
+      new Date(check_in_date),
+      new Date(check_out_date),
+      rooms_requested,
+      session
+    );
+
+    await session.commitTransaction();
+    logger.info('[Option] Transaction committed');
+
+    return option;
+
+  } catch (error) {
+    await session.abortTransaction();
+    logger.error(`[Option Service] Error: ${error.message}`);
+    throw error;
+  } finally {
+    session.endSession();
+  }
+};
+
+/**
+ * Confirm option - Option'ı gerçek rezervasyona çevir
+ */
+exports.confirmOption = async (optionId, guestData, user) => {
+  try {
+    const reservation = await Reservation.findById(optionId).populate('property_id');
+
+    if (!reservation) {
+      throw new Error('Option not found');
+    }
+
+    if (reservation.status !== 'option') {
+      throw new Error('This is not an option reservation');
+    }
+
+    if (reservation.isOptionExpired()) {
+      // Release inventory
+      await Inventory.updateOnCancellation(
+        reservation.property_id,
+        reservation.room_type_id,
+        reservation.check_in_date,
+        reservation.check_out_date,
+        reservation.rooms_requested || 1
+      );
+      reservation.status = 'option_expired';
+      await reservation.save();
+      throw new Error('Option has expired');
+    }
+
+    // Update guest info and confirm
+    reservation.guest = guestData;
+    reservation.status = 'confirmed';
+    reservation.confirmed_at = new Date();
+    reservation.option_expires_at = null;
+
+    await reservation.save();
+
+    logger.info(`[Option] Confirmed: ${reservation._id}`);
+
+    // Send confirmation email
+    try {
+      const emailService = require('./email.service');
+      emailService.sendBookingConfirmation(reservation, reservation.property_id);
+    } catch (emailErr) {
+      logger.warn('[Option] Email failed', { err: emailErr.message });
+    }
+
+    return reservation;
+
+  } catch (error) {
+    logger.error(`[Option Service] Confirm error: ${error.message}`);
+    throw error;
+  }
+};
+
+/**
+ * Expire options - Süresi dolan option'ları expire et ve envanteri serbest bırak
+ * Bu fonksiyon bir cron job ile çağrılmalı (örn: her 15 dakikada)
+ */
+exports.expireOptions = async () => {
+  try {
+    const expiredOptions = await Reservation.find({
+      status: 'option',
+      option_expires_at: { $lt: new Date() },
+    });
+
+    let expiredCount = 0;
+
+    for (const option of expiredOptions) {
+      try {
+        // Release inventory
+        await Inventory.updateOnCancellation(
+          option.property_id,
+          option.room_type_id,
+          option.check_in_date,
+          option.check_out_date,
+          option.rooms_requested || 1
+        );
+
+        option.status = 'option_expired';
+        await option.save();
+        expiredCount++;
+
+        logger.info(`[Option] Expired: ${option._id}`);
+      } catch (err) {
+        logger.error(`[Option] Expire error for ${option._id}: ${err.message}`);
+      }
+    }
+
+    return {
+      checked: expiredOptions.length,
+      expired: expiredCount,
+    };
+
+  } catch (error) {
+    logger.error(`[Option Service] ExpireOptions error: ${error.message}`);
     throw error;
   }
 };

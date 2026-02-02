@@ -451,24 +451,14 @@ export default function DashboardPage() {
                   <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
                     <CheckCircle className="w-8 h-8 text-green-600" />
                   </div>
-                  <h3 className="text-xl font-bold text-gray-900 mb-2">Flash Offer Gönderildi!</h3>
+                  <h3 className="text-xl font-bold text-gray-900 mb-2">Flash Offer Oluşturuldu!</h3>
                   <p className="text-gray-600 mb-6">
-                    {flashOfferResult.offer.property_name} için %{flashOfferResult.offer.discount_percentage} indirim
+                    {flashOfferResult.offer?.title || 'Flash Offer'} - %{flashOfferResult.offer?.discount_value || 0} indirim
                   </p>
 
-                  <div className="grid grid-cols-3 gap-4 mb-6">
-                    <div className="bg-green-50 rounded-xl p-4">
-                      <p className="text-2xl font-bold text-green-600">{flashOfferResult.notification_results.sent}</p>
-                      <p className="text-sm text-green-700">Gönderildi</p>
-                    </div>
-                    <div className="bg-yellow-50 rounded-xl p-4">
-                      <p className="text-2xl font-bold text-yellow-600">{flashOfferResult.notification_results.skipped}</p>
-                      <p className="text-sm text-yellow-700">Atlandı</p>
-                    </div>
-                    <div className="bg-red-50 rounded-xl p-4">
-                      <p className="text-2xl font-bold text-red-600">{flashOfferResult.notification_results.failed}</p>
-                      <p className="text-sm text-red-700">Başarısız</p>
-                    </div>
+                  <div className="bg-green-50 rounded-xl p-4 mb-6">
+                    <p className="text-lg font-bold text-green-600">{flashOfferResult.offer?.rooms_available || 0} Oda</p>
+                    <p className="text-sm text-green-700">Partner acentelere gösterilecek</p>
                   </div>
 
                   <Button
