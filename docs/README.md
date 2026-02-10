@@ -14,22 +14,14 @@
 **Enterprise-grade hotel automation platform** for hotels and travel agencies.  
 Intelligent reservation management, AI-powered dynamic pricing, and automated B2B workflows — all in one backend.
 
-[🌐 Live API](https://travelsync-backend.onrender.com) · [📖 Documentation](#-documentation) · [️ Security](#%EF%B8%8F-security) · [🗺️ Roadmap](#%EF%B8%8F-roadmap)
+[🌐 Live API](https://travelsync-backend.vercel.app/) · [📖 Documentation](#-documentation) · [️ Security](#%EF%B8%8F-security) · [🗺️ Roadmap](#%EF%B8%8F-roadmap)
 
 ---
 
 ## 🎬 Demo
 
-<p align="center">
-  <video src="./assets/demo.mp4" width="720" controls>
-    Your browser does not support the video tag.
-  </video>
-</p>
+https://github.com/cakmakg/travelsync-backend/raw/main/frontend/src/assets/video1.mp4
 
-<!-- Video dosyanızı docs/assets/demo.mp4 olarak yerleştirin -->
-<!-- Desteklenen formatlar: .mp4, .webm, .mov -->
-
----
 
 ## 🎯 What is TravelSync?
 
