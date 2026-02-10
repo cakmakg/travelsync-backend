@@ -4,7 +4,7 @@
 **Sprint:** 1 - Week 1  
 **Durum:** Backend hazır, Model'ler çalışıyor ✅
 
----
+---marmarishotel@mail.com Marmaris48?@
 
 ## ⚡ HIZLI BAŞLANGIÇ
 
