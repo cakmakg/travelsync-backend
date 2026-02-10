@@ -46,8 +46,7 @@ const TokenBlacklistSchema = new mongoose.Schema(
     expires_at: {
       type: Date,
       required: [true, 'Expiry time is required'],
-      index: true,
-      // TTL index: automatically delete after expiry
+      // TTL index defined below
     },
 
     revoked_at: {

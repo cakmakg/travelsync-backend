@@ -167,7 +167,7 @@ const FlashOfferSchema = new mongoose.Schema(
 
 // Indexes
 FlashOfferSchema.index({ hotel_org_id: 1, status: 1 });
-FlashOfferSchema.index({ offer_expires_at: 1 });
+
 FlashOfferSchema.index({ status: 1, offer_expires_at: 1 });
 FlashOfferSchema.index({ property_id: 1, status: 1 });
 

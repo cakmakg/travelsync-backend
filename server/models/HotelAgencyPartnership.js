@@ -129,7 +129,7 @@ HotelAgencyPartnershipSchema.index(
     { hotel_org_id: 1, agency_org_id: 1 },
     { unique: true }
 );
-HotelAgencyPartnershipSchema.index({ invitation_token: 1 });
+
 HotelAgencyPartnershipSchema.index({ invitation_email: 1 });
 
 // Pre-save: Generate invitation token if not exists
