@@ -8,18 +8,14 @@ import {
     Building2,
     Car,
     MapPin,
-    Utensils,
     Trash2,
     Save,
     Eye,
-    Copy,
     ChevronDown,
     ChevronUp,
     Calendar,
-    Users,
     DollarSign,
     Star,
-    Plane,
 } from 'lucide-react';
 import { toast } from 'sonner';
 

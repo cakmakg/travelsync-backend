@@ -9,7 +9,6 @@ import {
     Calendar,
     Users,
     Star,
-    Filter,
     ArrowRight
 } from 'lucide-react';
 import api from '@/services/api';
@@ -37,7 +36,7 @@ interface RoomResult {
 }
 
 export default function HotelSearchPage() {
-    const [searchParams, setSearchParams] = useSearchParams();
+    const [searchParams] = useSearchParams();
     const [hotels, setHotels] = useState<Hotel[]>([]);
     const [loading, setLoading] = useState(false);
     const [searched, setSearched] = useState(false);

@@ -143,7 +143,7 @@ const roomTypesSlice = createSlice({
     });
     builder.addCase(fetchRoomTypes.fulfilled, (state, action) => {
       state.loading = false;
-      state.roomTypes = action.payload.data?.items || action.payload.data || [];
+      state.roomTypes = (action.payload.data as any)?.items || action.payload.data || [];
       state.pagination = action.payload.pagination || null;
     });
     builder.addCase(fetchRoomTypes.rejected, (state, action) => {
@@ -158,7 +158,7 @@ const roomTypesSlice = createSlice({
     });
     builder.addCase(fetchRoomTypesByProperty.fulfilled, (state, action) => {
       state.loading = false;
-      state.roomTypes = action.payload.data?.items || action.payload.data || [];
+      state.roomTypes = (action.payload.data as any)?.items || action.payload.data || [];
       state.pagination = action.payload.pagination || null;
     });
     builder.addCase(fetchRoomTypesByProperty.rejected, (state, action) => {

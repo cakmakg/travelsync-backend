@@ -17,7 +17,7 @@ export default function PropertiesPage() {
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
 
   useEffect(() => {
-    dispatch(fetchProperties());
+    dispatch(fetchProperties({}));
   }, [dispatch]);
 
   const handleAddNew = () => {
@@ -91,9 +91,8 @@ export default function PropertiesPage() {
                     <h3 className="text-lg font-semibold text-gray-900">{property.name}</h3>
                     <p className="text-sm text-gray-500">{property.code}</p>
                   </div>
-                  <span className={`inline-block px-2 py-1 text-xs rounded-full ${
-                    property.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-                  }`}>
+                  <span className={`inline-block px-2 py-1 text-xs rounded-full ${property.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                    }`}>
                     {property.is_active ? 'Active' : 'Inactive'}
                   </span>
                 </div>

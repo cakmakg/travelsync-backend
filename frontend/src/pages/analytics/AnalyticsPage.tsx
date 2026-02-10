@@ -78,7 +78,7 @@ export default function AnalyticsPage() {
             const revenueData = revenueResponse.data;
 
             // Calculate previous period for comparison
-            const { start: prevStart, end: prevEnd } = getDateRange(timeRange);
+            const { start: prevStart } = getDateRange(timeRange);
             const prevStartDate = new Date(prevStart);
             const diff = new Date(end).getTime() - new Date(start).getTime();
             prevStartDate.setTime(prevStartDate.getTime() - diff);

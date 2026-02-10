@@ -1,9 +1,7 @@
-import { useEffect, useState } from 'react';
-import Card from '@/components/common/Card';
+import { useState } from 'react';
 import {
     Zap,
     Clock,
-    Building2,
     MapPin,
     Search,
     Filter
@@ -11,7 +9,7 @@ import {
 
 export default function FlashOffersPage() {
     // Mock flash offers data - would come from API
-    const [offers, setOffers] = useState([
+    const [offers] = useState([
         {
             id: '1',
             hotel_name: 'Grand Hotel Berlin',

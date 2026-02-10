@@ -118,7 +118,7 @@ const propertiesSlice = createSlice({
     });
     builder.addCase(fetchProperties.fulfilled, (state, action) => {
       state.loading = false;
-      state.properties = action.payload.data?.items || action.payload.data || [];
+      state.properties = (action.payload.data as any)?.items || action.payload.data || [];
       state.pagination = action.payload.pagination || null;
     });
     builder.addCase(fetchProperties.rejected, (state, action) => {

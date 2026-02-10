@@ -3,7 +3,6 @@ import {
     Plus,
     Search,
     Filter,
-    MoreVertical,
     Users,
     MousePointer2,
     TrendingUp,

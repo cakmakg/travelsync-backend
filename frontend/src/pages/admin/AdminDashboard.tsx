@@ -35,7 +35,7 @@ interface RecentActivity {
 }
 
 export default function AdminDashboard() {
-    const [loading, setLoading] = useState(true);
+    const [, setLoading] = useState(true);
     const [stats, setStats] = useState<SystemStats>({
         total_organizations: 0,
         total_hotels: 0,

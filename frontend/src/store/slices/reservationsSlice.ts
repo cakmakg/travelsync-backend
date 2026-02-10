@@ -69,7 +69,7 @@ const reservationsSlice = createSlice({
     });
     builder.addCase(fetchReservations.fulfilled, (state, action) => {
       state.loading = false;
-      state.reservations = action.payload.data?.items || action.payload.data || [];
+      state.reservations = (action.payload.data as any)?.items || action.payload.data || [];
       state.pagination = action.payload.pagination || null;
     });
     builder.addCase(fetchReservations.rejected, (state, action) => {

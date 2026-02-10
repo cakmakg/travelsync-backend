@@ -2,7 +2,6 @@ import { useState } from 'react';
 import Card from '@/components/common/Card';
 import {
     DollarSign,
-    Calendar,
     ChevronLeft,
     ChevronRight,
     Edit3,
@@ -61,7 +60,7 @@ export default function PricingPage() {
         return basePrice;
     };
 
-    const getOccupancyForDate = (date: Date) => {
+    const getOccupancyForDate = (_date: Date) => {
         // Mock occupancy data
         const random = Math.floor(Math.random() * 100);
         return random;
@@ -272,7 +271,7 @@ export default function PricingPage() {
                                         <div className="flex items-center gap-1 mt-1">
                                             <div
                                                 className={`h-1.5 rounded-full ${occupancy > 80 ? 'bg-red-500' :
-                                                        occupancy > 50 ? 'bg-yellow-500' : 'bg-green-500'
+                                                    occupancy > 50 ? 'bg-yellow-500' : 'bg-green-500'
                                                     }`}
                                                 style={{ width: `${occupancy}%` }}
                                             />
