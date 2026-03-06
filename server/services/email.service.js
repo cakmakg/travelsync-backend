@@ -187,3 +187,26 @@ exports.sendOptionExpiringWarning = async (option, property, agencyEmail) => {
   }
 };
 
+/**
+ * Send checkout feedback email to guest (24-48 hours after)
+ */
+exports.sendCheckoutFeedback = async (reservation, property) => {
+  try {
+    const to = reservation.guest?.email;
+    if (!to) throw new Error('Guest email not available');
+
+    // MOCK Google Review Link based on Property Name
+    const googleReviewLink = `https://g.page/r/${property?.name?.replace(/\s+/g, '')}/review`;
+
+    const html = renderTemplate('checkout-feedback', {
+      guest_name: reservation.guest?.name || 'Guest',
+      property_name: property?.name || 'our hotel',
+      review_link: googleReviewLink,
+    });
+
+    const subject = `How was your stay at ${property?.name || 'our hotel'}?`;
+    exports.sendMail({ to, subject, html }).catch((err) => logger.error('Checkout feedback email failed', err));
+  } catch (error) {
+    logger.error('sendCheckoutFeedback error', error);
+  }
+};

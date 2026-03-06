@@ -8,6 +8,12 @@ export const propertyService = {
     return response.data;
   },
 
+  // Get properties by minimum sustainability score
+  getSustainable: async (minScore: number): Promise<ApiResponse<Property[]>> => {
+    const response = await api.get(`/properties/sustainable/${minScore}`);
+    return response.data;
+  },
+
   // Get property by ID
   getById: async (id: string): Promise<ApiResponse<Property>> => {
     const response = await api.get(`/properties/${id}`);

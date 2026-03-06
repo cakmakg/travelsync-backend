@@ -237,6 +237,41 @@ const PropertySchema = new mongoose.Schema(
       default: true,
     },
 
+    // Sustainability & Green Hotel Metrics
+    sustainability: {
+      score: {
+        type: Number,
+        min: [0, 'Sustainability score cannot be negative'],
+        max: [100, 'Sustainability score cannot exceed 100'],
+        default: 0,
+      },
+      certifications: [
+        {
+          type: String, // e.g., 'LEED', 'GreenKey', 'Travelife', 'EarthCheck'
+          trim: true,
+        },
+      ],
+      eco_features: [
+        {
+          type: String,
+          enum: [
+            'solar_power',
+            'wind_power',
+            'water_recycling',
+            'no_single_use_plastics',
+            'locally_sourced_food',
+            'energy_efficient_lighting',
+            'ev_charging_station',
+            'eco_friendly_cleaning',
+          ],
+        },
+      ],
+      is_green_certified: {
+        type: Boolean,
+        default: false,
+      },
+    },
+
     // Metadata
     notes: {
       type: String,
@@ -255,6 +290,8 @@ PropertySchema.index({ is_active: 1 });
 PropertySchema.index({ star_rating: 1 });
 PropertySchema.index({ 'address.city': 1 });
 PropertySchema.index({ 'address.country': 1 });
+PropertySchema.index({ 'sustainability.score': -1 }); // Decreasing order makes sense for scores
+PropertySchema.index({ 'sustainability.is_green_certified': 1 });
 
 // Virtual: Room types
 PropertySchema.virtual('room_types', {

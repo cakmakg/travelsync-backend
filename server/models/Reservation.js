@@ -237,6 +237,12 @@ const ReservationSchema = new mongoose.Schema(
       default: 'GUEST',
     },
 
+    // Automation flags
+    feedback_email_sent: {
+      type: Boolean,
+      default: false,
+    },
+
     // Payment information
     payment: {
       method: {

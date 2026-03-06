@@ -305,3 +305,37 @@ exports.getPackageStats = async (req, res) => {
         });
     }
 };
+
+// @desc    Generate PDF Proposal for Package
+// @route   POST /api/v1/packages/:id/generate-pdf
+// @access  Private (Agency)
+exports.generatePdf = async (req, res) => {
+    try {
+        const pkg = await Package.findOne({
+            _id: req.params.id,
+            agency_org_id: req.user.organization_id,
+        });
+
+        if (!pkg) {
+            return res.status(404).json({
+                success: false,
+                message: 'Package not found',
+            });
+        }
+
+        const Organization = require('../models/Organization');
+        const organization = await Organization.findById(req.user.organization_id);
+
+        const pdfService = require('../services/pdf.service');
+        const pdfBuffer = await pdfService.generatePackageProposal(pkg, organization);
+
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename=Proposal-${pkg.code || 'pkg'}.pdf`);
+        res.send(pdfBuffer);
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: error.message,
+        });
+    }
+};

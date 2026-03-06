@@ -9,14 +9,15 @@ import AgencyDashboard from './AgencyDashboard';
 import {
   Building2,
   CalendarDays,
-  DollarSign,
-  TrendingUp,
   Zap,
   FileText,
   RefreshCw,
   Send,
   CheckCircle,
-  XCircle
+  XCircle,
+  Leaf,
+  Clock,
+  Star
 } from 'lucide-react';
 import { flashOfferService, reportService } from '@/services/flashOffer';
 import { toast } from 'sonner';
@@ -64,22 +65,22 @@ export default function DashboardPage() {
       color: 'bg-blue-500',
     },
     {
-      name: 'Active Reservations',
+      name: 'Confirmed Bookings',
       value: Array.isArray(reservations) ? reservations.filter((r) => r.status === 'confirmed').length : 0,
       icon: CalendarDays,
       color: 'bg-green-500',
     },
     {
-      name: 'Revenue (This Month)',
-      value: `€${Array.isArray(reservations) ? reservations.reduce((sum, r) => sum + (r.total_with_tax || 0), 0).toLocaleString() : '0'}`,
-      icon: DollarSign,
-      color: 'bg-yellow-500',
+      name: 'On Hold (Options)',
+      value: Array.isArray(reservations) ? reservations.filter((r) => r.status === 'option' || r.status === 'pending').length : 0,
+      icon: Clock,
+      color: 'bg-orange-500',
     },
     {
-      name: 'Occupancy Rate',
-      value: '75%',
-      icon: TrendingUp,
-      color: 'bg-purple-500',
+      name: 'Feedback Score',
+      value: '4.8/5.0',
+      icon: Star,
+      color: 'bg-yellow-500',
     },
   ];
 
@@ -236,10 +237,11 @@ export default function DashboardPage() {
                 <div className="text-right">
                   <p className="font-medium text-gray-900">€{reservation.total_with_tax}</p>
                   <span className={`inline-block px-2 py-1 text-xs rounded-full ${reservation.status === 'confirmed' ? 'bg-green-100 text-green-800' :
-                    reservation.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                    (reservation.status === 'option' || reservation.status === 'pending') ? 'bg-orange-100 text-orange-800 flex items-center' :
                       'bg-gray-100 text-gray-800'
                     }`}>
-                    {reservation.status}
+                    {(reservation.status === 'option' || reservation.status === 'pending') && <Clock className="w-3 h-3 mr-1" />}
+                    {reservation.status.charAt(0).toUpperCase() + reservation.status.slice(1)}
                   </span>
                 </div>
               </div>
@@ -259,13 +261,21 @@ export default function DashboardPage() {
                     <Building2 className="w-5 h-5 text-primary-600" />
                   </div>
                   <div>
-                    <p className="font-medium text-gray-900">{property.name}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium text-gray-900">{property.name}</p>
+                      {(property.sustainability && (property.sustainability.score >= 80 || property.sustainability.is_green_certified)) && (
+                        <span className="flex items-center px-2 py-0.5 bg-emerald-100 text-emerald-800 text-[10px] font-bold rounded-full" title="Eco-Certified Property">
+                          <Leaf className="w-3 h-3 mr-1" />
+                          {property.sustainability.score}
+                        </span>
+                      )}
+                    </div>
                     <p className="text-sm text-gray-500">{property.address.city}, {property.address.country}</p>
                   </div>
                 </div>
                 <span className={`inline-block px-2 py-1 text-xs rounded-full ${property.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
                   }`}>
-                  {property.is_active ? 'Active' : 'Inactive'}
+                  {property.is_active ? 'Live' : 'Inactive'}
                 </span>
               </div>
             ))}

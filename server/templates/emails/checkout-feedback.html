@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>How was your stay?</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: #f9f9f9;
+            margin: 0;
+            padding: 0;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 40px auto;
+            background: #fff;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+        }
+
+        .header {
+            background: #3b82f6;
+            color: white;
+            padding: 30px 20px;
+            text-align: center;
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        .footer {
+            background: #f1f5f9;
+            padding: 20px;
+            text-align: center;
+            font-size: 12px;
+            color: #64748b;
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 12px 24px;
+            background: #3b82f6;
+            color: white !important;
+            text-decoration: none;
+            border-radius: 6px;
+            font-weight: bold;
+            margin-top: 20px;
+            text-align: center;
+            width: auto;
+        }
+
+        .btn:hover {
+            background: #2563eb;
+        }
+
+        .greeting {
+            font-size: 18px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <h2>Thank You For Staying With Us!</h2>
+        </div>
+        <div class="content">
+            <p class="greeting">Dear {{ guest_name }},</p>
+            <p>We hope you had a wonderful journey back home. It was a pleasure having you at <strong>{{ property_name
+                    }}</strong>.</p>
+
+            <p>As a small business, your feedback means the world to us. If you enjoyed your stay, would you take a
+                minute to leave us a quick review? It helps us immensely and lets other travelers know what to expect.
+            </p>
+
+            <div style="text-align: center;">
+                <a href="{{ review_link }}" class="btn">Leave a Review on Google</a>
+            </div>
+
+            <p style="margin-top: 30px;">If anything during your stay was less than perfect, please reply directly to
+                this email so we can make it right next time.</p>
+            <p>Warm regards,<br>The Team at {{ property_name }}</p>
+        </div>
+        <div class="footer">
+            <p>&copy; 2026 {{ property_name }}. All rights reserved.</p>
+            <p>This is an automated message from TravelSync.</p>
+        </div>
+    </div>
+</body>
+
+</html>

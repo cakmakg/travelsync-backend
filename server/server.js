@@ -25,6 +25,13 @@ const server = app.listen(PORT, () => {
   logger.info(`Port: ${PORT}`);
   logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
   logger.info(`Time: ${new Date().toLocaleString()}`);
+
+  // Initialize Background Jobs
+  const { initOptionExpirationJob } = require('./jobs/optionExpirationJob');
+  initOptionExpirationJob();
+
+  const { initFeedbackEmailJob } = require('./jobs/feedbackEmailJob');
+  initFeedbackEmailJob();
 });
 
 // Graceful shutdown

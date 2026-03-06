@@ -2,6 +2,7 @@ import { useState } from 'react';
 import Card from '@/components/common/Card';
 import Button from '@/components/common/Button';
 import Input from '@/components/common/Input';
+import { packageService } from '@/services/packageService';
 import {
     Package,
     Plus,
@@ -236,9 +237,31 @@ export default function PackageBuilderPage() {
                 status: publish ? 'active' : 'draft',
             };
 
-            // TODO: API call
-            console.log('Package data:', packageData);
-            toast.success(publish ? 'Package published!' : 'Package saved as draft');
+            // Use API service
+            const result = await packageService.createPackage(packageData as any);
+            console.log('Created package:', result);
+
+            toast.success(publish ? 'Package published successfully!' : 'Package saved as draft');
+
+            // If publish, automatically trigger PDF Generation
+            if (publish && result.data && result.data._id) {
+                toast.info('Generating professional PDF quote...');
+                try {
+                    const blob = await packageService.generatePdf(result.data._id);
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `TravelSync_${packageData.name.replace(/\s+/g, '_')}_Quote.pdf`;
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    document.body.removeChild(a);
+                    toast.success('PDF Proposal Downloaded!');
+                } catch (pdfError) {
+                    console.error('PDF Generation Error:', pdfError);
+                    toast.error('Failed to generate PDF. You can try again from the dashboard.');
+                }
+            }
         } catch (error) {
             toast.error('Failed to save package');
         } finally {

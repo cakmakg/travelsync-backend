@@ -202,6 +202,30 @@ const login = async (req, res) => {
       });
     }
 
+    // B2B SECURITY: Check Parent Organization Status
+    const organization = await Organization.findById(user.organization_id).select('name type country currency is_active subscription filter');
+
+    if (!organization) {
+      return res.status(404).json({
+        success: false,
+        error: { message: 'Organization not found.' }
+      });
+    }
+
+    if (!organization.is_active) {
+      return res.status(403).json({
+        success: false,
+        error: { message: 'Your organization account has been deactivated. Please contact support.' }
+      });
+    }
+
+    if (organization.subscription && ['cancelled', 'past_due'].includes(organization.subscription.status)) {
+      return res.status(403).json({
+        success: false,
+        error: { message: 'Your organization\'s subscription is inactive or past due.' }
+      });
+    }
+
     // Update last login
     await user.updateLastLogin();
 
@@ -217,12 +241,12 @@ const login = async (req, res) => {
     const tokens = generateTokens(user);
 
     // Get organization info for response
-    const organization = await Organization.findById(user.organization_id).select('name type country currency');
+    const orgInfo = await Organization.findById(user.organization_id).select('name type country currency');
 
     // Remove password from response and add organization_type
     const userResponse = user.toObject();
     delete userResponse.password;
-    userResponse.organization_type = organization?.type || null;
+    userResponse.organization_type = orgInfo?.type || null;
 
     res.status(200).json({
       success: true,
@@ -324,6 +348,31 @@ const refreshToken = async (req, res) => {
         error: {
           message: 'Invalid refresh token.',
         },
+      });
+    }
+
+    // B2B SECURITY: Check Parent Organization Status on Refresh
+    const ObjectOrg = require('../models').Organization;
+    const organization = await ObjectOrg.findById(user.organization_id).select('is_active subscription');
+
+    if (!organization) {
+      return res.status(404).json({
+        success: false,
+        error: { message: 'Organization not found.' }
+      });
+    }
+
+    if (!organization.is_active) {
+      return res.status(403).json({
+        success: false,
+        error: { message: 'Your organization account has been deactivated. Token refresh denied.' }
+      });
+    }
+
+    if (organization.subscription && ['cancelled', 'past_due'].includes(organization.subscription.status)) {
+      return res.status(403).json({
+        success: false,
+        error: { message: 'Your organization\'s subscription is inactive or past due. Token refresh denied.' }
       });
     }
 

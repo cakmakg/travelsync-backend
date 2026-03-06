@@ -373,6 +373,209 @@ class PdfService {
             }
         });
     }
+    /**
+     * B2B Paket Teklif PDF'i Oluştur (Package Proposal)
+     */
+    async generatePackageProposal(pkg, organization) {
+        // PDF döküman tanımı
+        const docDefinition = {
+            pageSize: 'A4',
+            pageMargins: [40, 60, 40, 80],
+
+            header: {
+                columns: [
+                    { text: 'Seyehat Teklifi (Travel Proposal)', style: 'headerText' },
+                    { text: `Tarih: ${new Date().toLocaleDateString('de-DE')}`, alignment: 'right', style: 'headerText' }
+                ],
+                margin: [40, 20]
+            },
+
+            footer: function (currentPage, pageCount) {
+                return {
+                    columns: [
+                        { text: organization?.name || 'TravelSync Agency', style: 'footerText' },
+                        { text: `Sayfa ${currentPage} / ${pageCount}`, alignment: 'right', style: 'footerText' }
+                    ],
+                    margin: [40, 20]
+                };
+            },
+
+            content: [
+                // Başlık ve Acente Bilgileri
+                {
+                    columns: [
+                        { text: organization?.name || 'Acente Adı', style: 'agencyTitle' },
+                        { text: `Teklif Kodu: ${pkg.code || 'N/A'}`, alignment: 'right', style: 'quoteCode' }
+                    ]
+                },
+                { text: organization?.contact?.email || '', style: 'agencyContact' },
+                { text: organization?.contact?.phone || '', style: 'agencyContact', margin: [0, 0, 0, 30] },
+
+                // Paket Özeti
+                { text: pkg.name || 'Özel Paket Tur', style: 'title' },
+                { text: pkg.description || 'Bu teklif size özel hazırlanmıştır.', margin: [0, 0, 0, 20] },
+
+                // Temel Bilgiler Tablosu
+                { text: 'Tur Özeti', style: 'sectionHeader' },
+                {
+                    table: {
+                        widths: ['*', '*'],
+                        body: [
+                            ['Varış Noktası', `${pkg.destination?.city || ''}, ${pkg.destination?.country || ''}`],
+                            ['Süre', `${pkg.duration?.nights || 0} Gece / ${pkg.duration?.days || 0} Gün`],
+                            ['Tarih Aralığı', `${new Date(pkg.valid_from).toLocaleDateString('de-DE')} - ${new Date(pkg.valid_to).toLocaleDateString('de-DE')}`],
+                            ['Tur Tipi', pkg.package_type || 'Custom']
+                        ]
+                    },
+                    layout: 'lightHorizontalLines',
+                    margin: [0, 5, 0, 20]
+                },
+
+                // Konaklama
+                this._generatePackageAccommodationTable(pkg.accommodation),
+
+                // Ekstralar
+                this._generatePackageExtrasTable(pkg),
+
+                // Fiyat Özeti
+                { text: '', margin: [0, 20] },
+                { text: 'Fiyat Detayı', style: 'sectionHeader' },
+                {
+                    table: {
+                        widths: ['*', 'auto'],
+                        body: [
+                            [{ text: 'Kişi Başı Ücret', style: 'tableHeader' }, { text: 'Tutar', style: 'tableHeader' }],
+                            ['YetişkinFiyatı', `${pkg.pricing?.price_adult || 0} ${pkg.pricing?.currency || 'EUR'}`],
+                            ...(pkg.pricing?.price_child ? [['Çocuk Fiyatı', `${pkg.pricing.price_child} ${pkg.pricing?.currency || 'EUR'}`]] : []),
+                            ...(pkg.pricing?.single_supplement ? [['Tek Kişi Farkı', `${pkg.pricing.single_supplement} ${pkg.pricing?.currency || 'EUR'}`]] : []),
+                            ['Pakete Dahil Olanlar', { text: `${pkg.pricing?.includes_transfers ? 'Transfer ✔\n' : ''}${pkg.pricing?.includes_activities ? 'Aktivite ✔' : ''}`, italics: true }]
+                        ]
+                    },
+                    layout: 'headerLineOnly',
+                    margin: [0, 5, 0, 30]
+                },
+
+                // Kurallar ve Şartlar
+                { text: 'Kurallar ve İptal Şartları', style: 'sectionHeader' },
+                { text: pkg.cancellation_policy || 'Standart iptal kuralları geçerlidir.', fontSize: 10, margin: [0, 5, 0, 10] },
+                { text: pkg.terms_conditions || '', fontSize: 10 }
+            ],
+
+            styles: {
+                title: { fontSize: 22, bold: true, color: '#1e3a8a', margin: [0, 0, 0, 5] },
+                agencyTitle: { fontSize: 16, bold: true, color: '#334155' },
+                quoteCode: { fontSize: 14, color: '#64748b' },
+                agencyContact: { fontSize: 10, color: '#64748b' },
+                sectionHeader: { fontSize: 14, bold: true, color: '#2563eb', margin: [0, 10, 0, 5] },
+                tableHeader: { bold: true, fillColor: '#f3f4f6' },
+                headerText: { fontSize: 9, color: '#666666' },
+                footerText: { fontSize: 8, color: '#999999' }
+            }
+        };
+
+        // PDF oluştur
+        return new Promise((resolve, reject) => {
+            try {
+                // The constructor is initialized at the top level of this file 
+                // so we use that instance: this assumes `printer` is globally defined in this file.
+                // However, pdfmake needs to be initialized. The file already has `const printer = new PdfPrinter(fonts);` at top.
+                // We'll just rely on the existing instance from line 19.
+                // Wait, it's outside class. So we can just use `printer.createPdfKitDocument`.
+
+                // Note: The file defines `const printer = new PdfPrinter(fonts);` at line 19 outside class.
+                // We shouldn't require it again here but use the outer scope variable.
+                const pdfmake = require('pdfmake');
+                const fonts = {
+                    Roboto: {
+                        normal: 'node_modules/pdfmake/build/vfs_fonts/Roboto-Regular.ttf',
+                        bold: 'node_modules/pdfmake/build/vfs_fonts/Roboto-Medium.ttf',
+                        italics: 'node_modules/pdfmake/build/vfs_fonts/Roboto-Italic.ttf',
+                        bolditalics: 'node_modules/pdfmake/build/vfs_fonts/Roboto-MediumItalic.ttf'
+                    }
+                };
+                const localPrinter = new pdfmake(fonts);
+
+                const pdfDoc = localPrinter.createPdfKitDocument(docDefinition);
+                const chunks = [];
+
+                pdfDoc.on('data', chunk => chunks.push(chunk));
+                pdfDoc.on('end', () => resolve(Buffer.concat(chunks)));
+                pdfDoc.on('error', reject);
+
+                pdfDoc.end();
+            } catch (error) {
+                reject(error);
+            }
+        });
+    }
+
+    _generatePackageAccommodationTable(accommodation) {
+        if (!accommodation || accommodation.length === 0) {
+            return { text: '' };
+        }
+
+        const tableBody = [
+            [{ text: 'Otel', style: 'tableHeader' }, { text: 'Oda Tipi', style: 'tableHeader' }, { text: 'Pansiyon', style: 'tableHeader' }, { text: 'Gece', style: 'tableHeader' }]
+        ];
+
+        accommodation.forEach(acc => {
+            tableBody.push([
+                acc.hotel_name || 'Bilinmiyor',
+                acc.room_name || 'Standart',
+                acc.board_type ? acc.board_type.replace('_', ' ').toUpperCase() : 'Bilinmiyor',
+                (acc.nights || 0).toString()
+            ]);
+        });
+
+        return [
+            { text: 'Konaklama Planı', style: 'sectionHeader' },
+            {
+                table: { widths: ['*', 'auto', 'auto', 'auto'], body: tableBody },
+                layout: 'lightHorizontalLines',
+                margin: [0, 5, 0, 15]
+            }
+        ];
+    }
+
+    _generatePackageExtrasTable(pkg) {
+        const hasTransfers = pkg.transfers && pkg.transfers.length > 0;
+        const hasActivities = pkg.activities && pkg.activities.length > 0;
+
+        if (!hasTransfers && !hasActivities) return { text: '' };
+
+        const tableBody = [
+            [{ text: 'Tür', style: 'tableHeader' }, { text: 'Açıklama', style: 'tableHeader' }, { text: 'Dahil mi?', style: 'tableHeader' }]
+        ];
+
+        if (hasTransfers) {
+            pkg.transfers.forEach(t => {
+                tableBody.push([
+                    'Transfer',
+                    `${t.type ? t.type.replace('_', ' ') : 'Transfer'} - ${t.from_location || ''} -> ${t.to_location || ''}`,
+                    t.included ? 'Evet' : 'Hayır'
+                ]);
+            });
+        }
+
+        if (hasActivities) {
+            pkg.activities.forEach(a => {
+                tableBody.push([
+                    'Aktivite',
+                    a.name || 'Tur Programı',
+                    a.included ? 'Evet' : 'Hayır'
+                ]);
+            });
+        }
+
+        return [
+            { text: 'Transfer ve Aktiviteler', style: 'sectionHeader' },
+            {
+                table: { widths: ['auto', '*', 'auto'], body: tableBody },
+                layout: 'lightHorizontalLines',
+                margin: [0, 5, 0, 15]
+            }
+        ];
+    }
 }
 
 module.exports = new PdfService();

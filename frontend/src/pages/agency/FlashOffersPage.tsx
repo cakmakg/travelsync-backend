@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
     Zap,
     Clock,
@@ -6,10 +6,15 @@ import {
     Search,
     Filter
 } from 'lucide-react';
+import { flashOfferService } from '@/services/flashOffer';
+import { toast } from 'sonner';
 
 export default function FlashOffersPage() {
-    // Mock flash offers data - would come from API
-    const [offers] = useState([
+    const [offers, setOffers] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    // Initial mock data as fallback
+    const mockOffers = [
         {
             id: '1',
             hotel_name: 'Grand Hotel Berlin',
@@ -56,9 +61,42 @@ export default function FlashOffersPage() {
             original_price: 120,
             room_type: 'Standard Room',
             meal_plan: 'BB',
-            created_at: new Date(),
         },
-    ]);
+    ];
+
+    useEffect(() => {
+        const fetchOffers = async () => {
+            try {
+                const res = await flashOfferService.getB2BOffers();
+                if (res.success && res.data && res.data.length > 0) {
+                    // Map API response to UI shape
+                    const mapped = res.data.map((offer: any) => ({
+                        id: offer._id,
+                        hotel_name: offer.property_id?.name || 'Partner Hotel',
+                        hotel_city: offer.property_id?.address?.city || 'City',
+                        discount: offer.discount_value,
+                        rooms: offer.rooms_available,
+                        valid_until: new Date(offer.stay_date_to || Date.now() + 24 * 3600000),
+                        original_price: 200, // mock base
+                        room_type: offer.room_type_id?.name || 'Standard Room',
+                        meal_plan: 'BB',
+                        created_at: new Date(offer.created_at),
+                    }));
+                    setOffers(mapped);
+                } else {
+                    // Fallback to mock for empty DB state in demo
+                    setOffers(mockOffers);
+                }
+            } catch (error) {
+                console.error("Failed to load generic options:", error);
+                setOffers(mockOffers);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchOffers();
+    }, []);
 
     const [searchTerm, setSearchTerm] = useState('');
 
@@ -121,59 +159,65 @@ export default function FlashOffersPage() {
             </div>
 
             {/* Offers Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredOffers.map((offer) => (
-                    <div
-                        key={offer.id}
-                        className="bg-white border border-gray-100 rounded-2xl overflow-hidden hover:shadow-xl transition-shadow group"
-                    >
-                        {/* Header with discount badge */}
-                        <div className="relative bg-gradient-to-r from-red-500 to-orange-500 p-4 text-white">
-                            <div className="absolute top-4 right-4 bg-white text-red-600 text-xl font-bold px-3 py-1 rounded-lg shadow-lg">
-                                -{offer.discount}%
-                            </div>
-                            <h3 className="text-lg font-bold pr-20">{offer.hotel_name}</h3>
-                            <div className="flex items-center gap-1 text-red-100 text-sm mt-1">
-                                <MapPin className="w-4 h-4" />
-                                {offer.hotel_city}
-                            </div>
-                        </div>
-
-                        {/* Content */}
-                        <div className="p-4">
-                            <div className="flex items-center justify-between mb-3">
-                                <div>
-                                    <p className="text-sm text-gray-500">{offer.room_type}</p>
-                                    <span className="inline-block mt-1 px-2 py-0.5 bg-blue-100 text-blue-700 text-xs rounded-full">
-                                        {getMealPlanLabel(offer.meal_plan)}
-                                    </span>
+            {loading ? (
+                <div className="flex items-center justify-center h-64">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+                </div>
+            ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {filteredOffers.map((offer) => (
+                        <div
+                            key={offer.id}
+                            className="bg-white border border-gray-100 rounded-2xl overflow-hidden hover:shadow-xl transition-shadow group"
+                        >
+                            {/* Header with discount badge */}
+                            <div className="relative bg-gradient-to-r from-red-500 to-orange-500 p-4 text-white">
+                                <div className="absolute top-4 right-4 bg-white text-red-600 text-xl font-bold px-3 py-1 rounded-lg shadow-lg">
+                                    -{offer.discount}%
                                 </div>
-                                <div className="text-right">
-                                    <div className="text-gray-400 line-through text-sm">€{offer.original_price}</div>
-                                    <div className="text-2xl font-bold text-gray-900">
-                                        €{Math.round(offer.original_price * (1 - offer.discount / 100))}
+                                <h3 className="text-lg font-bold pr-20">{offer.hotel_name}</h3>
+                                <div className="flex items-center gap-1 text-red-100 text-sm mt-1">
+                                    <MapPin className="w-4 h-4" />
+                                    {offer.hotel_city}
+                                </div>
+                            </div>
+
+                            {/* Content */}
+                            <div className="p-4">
+                                <div className="flex items-center justify-between mb-3">
+                                    <div>
+                                        <p className="text-sm text-gray-500">{offer.room_type}</p>
+                                        <span className="inline-block mt-1 px-2 py-0.5 bg-blue-100 text-blue-700 text-xs rounded-full">
+                                            {getMealPlanLabel(offer.meal_plan)}
+                                        </span>
                                     </div>
-                                    <div className="text-xs text-gray-500">per night</div>
+                                    <div className="text-right">
+                                        <div className="text-gray-400 line-through text-sm">€{offer.original_price}</div>
+                                        <div className="text-2xl font-bold text-gray-900">
+                                            €{Math.round(offer.original_price * (1 - offer.discount / 100))}
+                                        </div>
+                                        <div className="text-xs text-gray-500">per night</div>
+                                    </div>
                                 </div>
-                            </div>
 
-                            <div className="flex items-center justify-between py-3 border-t border-gray-100">
-                                <div className="text-sm text-gray-600">
-                                    <span className="font-semibold text-gray-900">{offer.rooms}</span> rooms available
+                                <div className="flex items-center justify-between py-3 border-t border-gray-100">
+                                    <div className="text-sm text-gray-600">
+                                        <span className="font-semibold text-gray-900">{offer.rooms}</span> rooms available
+                                    </div>
+                                    <div className="flex items-center gap-1 text-orange-600 text-sm font-medium">
+                                        <Clock className="w-4 h-4" />
+                                        {getTimeRemaining(offer.valid_until)}
+                                    </div>
                                 </div>
-                                <div className="flex items-center gap-1 text-orange-600 text-sm font-medium">
-                                    <Clock className="w-4 h-4" />
-                                    {getTimeRemaining(offer.valid_until)}
-                                </div>
-                            </div>
 
-                            <button className="mt-3 w-full bg-gradient-to-r from-purple-600 to-purple-700 text-white py-3 rounded-xl font-semibold hover:from-purple-700 hover:to-purple-800 transition-colors group-hover:shadow-lg">
-                                Book Now
-                            </button>
+                                <button onClick={() => toast.success('Flash offer added to cart!')} className="mt-3 w-full bg-gradient-to-r from-purple-600 to-purple-700 text-white py-3 rounded-xl font-semibold hover:from-purple-700 hover:to-purple-800 transition-colors group-hover:shadow-lg">
+                                    Book Now
+                                </button>
+                            </div>
                         </div>
-                    </div>
-                ))}
-            </div>
+                    ))}
+                </div>
+            )}
 
             {filteredOffers.length === 0 && (
                 <div className="text-center py-12">

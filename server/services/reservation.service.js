@@ -55,6 +55,19 @@ exports.createReservation = async (data, user) => {
         await session.abortTransaction();
         throw new Error('Agency is not active');
       }
+
+      // B2B SPAM PROTECTION: Max 5 active pending/option reservations per agency
+      const activeOptions = await Reservation.countDocuments({
+        agency_id,
+        status: { $in: ['pending', 'option'] },
+        deleted_at: null
+      }).session(session);
+
+      if (activeOptions >= 5) {
+        await session.abortTransaction();
+        throw new Error('B2B Limit: You cannot hold more than 5 reservations simultaneously. Please confirm or cancel pending options.');
+      }
+
       logger.debug(`[Reservation] Agency validated: ${agency.name}`);
     }
 
@@ -518,6 +531,32 @@ exports.cancelReservation = async (id, reason, _user) => {
       throw new Error('Cannot cancel checked-out reservation');
     }
 
+    // B2B CANCELLATION RULES (GoBD compliant logical check)
+    // We must check the rate plan to ensure it's not a non-refundable booking.
+    const RatePlan = require('../models').RatePlan;
+    const ratePlan = await RatePlan.findById(reservation.rate_plan_id).session(session);
+
+    if (ratePlan) {
+      if (ratePlan.cancellation_policy === 'non_refundable') {
+        await session.abortTransaction();
+        throw new Error('B2B Policy: Cannot cancel a non-refundable reservation.');
+      }
+
+      const checkInDate = new Date(reservation.check_in_date);
+      const today = new Date();
+      const daysUntilCheckIn = Math.ceil((checkInDate - today) / (1000 * 60 * 60 * 24));
+
+      if (ratePlan.cancellation_policy === 'strict' && daysUntilCheckIn < 7) {
+        await session.abortTransaction();
+        throw new Error('B2B Policy: Strict reservations cannot be cancelled within 7 days of check-in.');
+      }
+
+      if (ratePlan.cancellation_policy === 'moderate' && daysUntilCheckIn < 3) {
+        await session.abortTransaction();
+        throw new Error('B2B Policy: Moderate reservations cannot be cancelled within 3 days of check-in.');
+      }
+    }
+
     // Cancel reservation (WITHIN TRANSACTION)
     reservation.status = 'cancelled';
     reservation.cancelled_at = new Date();
@@ -569,6 +608,7 @@ exports.cancelReservation = async (id, reason, _user) => {
 
     // Send cancellation email asynchronously
     try {
+      const Property = require('../models').Property;
       const property = await Property.findById(reservation.property_id).select('name contact');
       const emailService = require('./email.service');
       emailService.sendCancellation(reservation, property, reason);
@@ -776,10 +816,10 @@ exports.createOption = async (data, user) => {
       rooms_requested = 1,
     } = data;
 
+    const Property = require('../models').Property;
     logger.info(`[Option] Creating option: ${JSON.stringify({ property_id, room_type_id, option_hours })}`);
 
     // 1. Validate property
-    const Property = require('../models').Property;
     const property = await Property.findById(property_id).session(session);
     if (!property) {
       await session.abortTransaction();
@@ -856,7 +896,7 @@ exports.createOption = async (data, user) => {
 /**
  * Confirm option - Option'ı gerçek rezervasyona çevir
  */
-exports.confirmOption = async (optionId, guestData, user) => {
+exports.confirmOption = async (optionId, guestData) => {
   try {
     const reservation = await Reservation.findById(optionId).populate('property_id');
 

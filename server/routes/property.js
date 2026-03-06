@@ -37,6 +37,13 @@ router.get('/country/:country', authenticate, propertyController.getByCountry);
 router.get('/rating/:rating', authenticate, propertyController.getByRating);
 
 /**
+ * @route   GET /api/v1/properties/sustainable/:minScore
+ * @desc    Get properties with a minimum sustainability score
+ * @access  Private
+ */
+router.get('/sustainable/:minScore', authenticate, propertyController.getBySustainabilityMinScore);
+
+/**
  * @route   GET /api/v1/properties/:id
  * @desc    Get property by ID
  * @access  Private

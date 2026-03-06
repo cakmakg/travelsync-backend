@@ -95,6 +95,11 @@ export interface Property {
     timezone?: string;
     currency?: string;
   };
+  sustainability?: {
+    score: number;
+    is_green_certified: boolean;
+    eco_features: string[];
+  };
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -156,7 +161,7 @@ export interface Reservation {
   rooms_requested: number;
   room_type_id: string;
   rate_plan_id: string;
-  status: 'pending' | 'confirmed' | 'checked_in' | 'checked_out' | 'cancelled';
+  status: 'pending' | 'option' | 'confirmed' | 'checked_in' | 'checked_out' | 'cancelled';
   source: 'direct' | 'phone' | 'email' | 'ota' | 'agency';
   currency: string;
   subtotal: number;

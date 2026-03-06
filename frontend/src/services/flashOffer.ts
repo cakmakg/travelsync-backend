@@ -60,6 +60,12 @@ export const flashOfferService = {
         return response.data;
     },
 
+    // Acente için aktif B2B Flash Offer'ları listele
+    getB2BOffers: async () => {
+        const response = await api.get<{ success: boolean; data: any[] }>('/flash-offers/b2b');
+        return response.data;
+    },
+
     // WhatsApp durumu
     getWhatsAppStatus: async () => {
         const response = await api.get<{ success: boolean; data: WhatsAppStatus }>('/flash-offers/whatsapp-status');

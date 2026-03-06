@@ -16,6 +16,7 @@ const {
     pausePackage,
     duplicatePackage,
     getPackageStats,
+    generatePdf,
 } = require('../controllers/package.controller');
 
 const { authenticate } = require('../middlewares/auth');
@@ -40,5 +41,6 @@ router.route('/:id')
 router.post('/:id/publish', publishPackage);
 router.post('/:id/pause', pausePackage);
 router.post('/:id/duplicate', duplicatePackage);
+router.post('/:id/generate-pdf', generatePdf);
 
 module.exports = router;

@@ -12,10 +12,10 @@ const asyncHandler = require('../middlewares/asyncHandler');
 class PropertyController extends BaseController {
   constructor() {
     super(Property, 'property');
-    
+
     // Search fields for getAll
     this.searchFields = ['name', 'code', 'address.city', 'address.country'];
-    
+
     // Populate fields
     this.populateFields = 'organization_id';
   }
@@ -225,6 +225,29 @@ class PropertyController extends BaseController {
     };
 
     return res.success(stats);
+  });
+
+  /**
+   * 📊 GET BY SUSTAINABILITY SCORE
+   * Get green properties by minimum sustainability score
+   */
+  getBySustainabilityMinScore = asyncHandler(async (req, res) => {
+    const { minScore } = req.params;
+    const scoreNum = parseInt(minScore);
+
+    if (isNaN(scoreNum) || scoreNum < 0 || scoreNum > 100) {
+      return res.badRequest('Score must be a number between 0 and 100');
+    }
+
+    const properties = await Property.find({
+      'sustainability.score': { $gte: scoreNum },
+      organization_id: req.user?.organization_id,
+      deleted_at: null
+    })
+      .sort({ 'sustainability.score': -1 })
+      .populate('organization_id');
+
+    return res.success(properties);
   });
 }
 
